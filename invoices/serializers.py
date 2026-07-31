@@ -1,0 +1,195 @@
+from rest_framework import serializers
+
+from .models import (
+    StaffProfile, Auction, Winner, ImportBatch, FeeConfig,
+    Invoice, InvoiceLot, Payment, Attachment, AuditLog,
+)
+
+
+def user_display_name(user):
+    """
+    The API contract shows fields like performedBy/verifiedBy/uploadedBy as
+    plain display-name strings ("Sara Admin"), not user IDs or nested user
+    objects.
+    """
+    if not user:
+        return ''
+    return user.get_full_name() or user.get_username()
+
+
+# ---------------------------------------------------------------- Auction
+
+class AuctionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Auction
+        fields = ['id', 'seller_name', 'auctionName', 'auctionDate', 'status', 'createdAt']
+
+
+# ----------------------------------------------------------------- Winner
+
+class WinnerSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Winner
+        fields = [
+            'id', 'bidderName', 'companyName', 'winnerPhone', 'winnerEmail',
+            'auction', 'importBatch', 'winningAmount', 'initialPrice',
+            'cpoAmount', 'cpoBank', 'submittedAt', 'createdAt',
+        ]
+
+
+# ------------------------------------------------------------- ImportBatch
+
+class ImportBatchSerializer(serializers.ModelSerializer):
+    importedBy = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ImportBatch
+        fields = [
+            'id', 'fileName', 'batchName', 'companyName', 'auctionDate',
+            'uploadDate', 'status', 'totalRecords', 'validRecords',
+            'invalidRecords', 'importedBy',
+        ]
+
+    def get_importedBy(self, obj):
+        return user_display_name(obj.importedBy)
+
+
+# --------------------------------------------------------------- FeeConfig
+
+class FeeConfigSerializer(serializers.ModelSerializer):
+    configuredBy = serializers.SerializerMethodField()
+
+    class Meta:
+        model = FeeConfig
+        fields = ['percentage', 'configuredBy', 'configuredAt']
+
+    def get_configuredBy(self, obj):
+        return user_display_name(obj.configuredBy)
+
+
+# ------------------------------------------------------------- InvoiceLot
+
+class InvoiceLotSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = InvoiceLot
+        fields = [
+            'id', 'lotNumber', 'auctionName', 'initialPrice', 'winningAmount',
+            'cpoAmount', 'cpoBank', 'feePercentage', 'lotFee', 'submittedAt',
+        ]
+
+
+# --------------------------------------------------------------- Payment
+
+class PaymentSerializer(serializers.ModelSerializer):
+    verifiedBy = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Payment
+        fields = [
+            'id', 'invoice', 'amountPaid', 'paymentMethod', 'paymentDate',
+            'uploadedAt', 'verifiedBy', 'verifiedDate', 'paymentStatus', 'remarks',
+        ]
+        read_only_fields = ['uploadedAt', 'verifiedDate']
+
+    def get_verifiedBy(self, obj):
+        return user_display_name(obj.verifiedBy)
+
+
+# ------------------------------------------------------------- Attachment
+
+class AttachmentSerializer(serializers.ModelSerializer):
+    uploadedBy = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Attachment
+        fields = [
+            'id', 'invoice', 'fileName', 'filePath', 'fileExtension',
+            'documentType', 'uploadDate', 'fileSize', 'uploadedBy',
+        ]
+        read_only_fields = ['uploadDate']
+
+    def get_uploadedBy(self, obj):
+        return user_display_name(obj.uploadedBy)
+
+
+# -------------------------------------------------------------- AuditLog
+
+class AuditLogSerializer(serializers.ModelSerializer):
+    performedBy = serializers.SerializerMethodField()
+
+    class Meta:
+        model = AuditLog
+        fields = [
+            'id', 'invoice', 'action', 'performedBy', 'userRole',
+            'previousValue', 'newValue', 'reason', 'actionDate',
+        ]
+        read_only_fields = fields
+
+    def get_performedBy(self, obj):
+        return user_display_name(obj.performedBy)
+
+
+# ------------------------------------------------------- Invoice (shared)
+
+class InvoiceWinnerFieldsMixin:
+    def get_bidderName(self, obj):
+        return obj.winner.bidderName
+
+    def get_companyName(self, obj):
+        return obj.winner.companyName
+
+    def get_winnerPhone(self, obj):
+        return obj.winner.winnerPhone
+
+
+# ---------------------------------------------------- Invoice (list view)
+
+class InvoiceListSerializer(InvoiceWinnerFieldsMixin, serializers.ModelSerializer):
+    winner = WinnerSerializer(read_only=True)
+    totalAmount = serializers.ReadOnlyField()
+    bidderName = serializers.SerializerMethodField()
+    companyName = serializers.SerializerMethodField()
+    winnerPhone = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Invoice
+        fields = [
+            'id', 'invoiceNumber', 'invoiceDate', 'dueDate', 'winner',
+            'totalAmount', 'status', 'createdAt', 'updatedAt',
+            'bidderName', 'companyName', 'winnerPhone',
+        ]
+
+
+# -------------------------------------------------- Invoice (detail view)
+
+class InvoiceDetailSerializer(InvoiceWinnerFieldsMixin, serializers.ModelSerializer):
+    winner = WinnerSerializer(read_only=True)
+    lots = InvoiceLotSerializer(many=True, read_only=True)
+    payments = PaymentSerializer(many=True, read_only=True)
+    attachments = AttachmentSerializer(many=True, read_only=True)
+    totalAmount = serializers.ReadOnlyField()
+    bidderName = serializers.SerializerMethodField()
+    companyName = serializers.SerializerMethodField()
+    winnerPhone = serializers.SerializerMethodField()
+    feePercentage = serializers.SerializerMethodField()
+    verifiedBy = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Invoice
+        fields = [
+            'id', 'invoiceNumber', 'invoiceDate', 'dueDate', 'winner',
+            'importBatch', 'totalAmount', 'status', 'remarks',
+            'createdAt', 'updatedAt', 'lots', 'payments', 'attachments',
+            'bidderName', 'companyName', 'winnerPhone',
+            'feePercentage', 'verifiedBy',
+        ]
+
+    def get_feePercentage(self, obj):
+        percentages = {str(lot.feePercentage) for lot in obj.lots.all()}
+        if len(percentages) == 1:
+            return percentages.pop()
+        return 'Mixed'
+
+    def get_verifiedBy(self, obj):
+        latest = obj.payments.filter(paymentStatus='verified').order_by('-verifiedDate').first()
+        return user_display_name(latest.verifiedBy) if latest else ''

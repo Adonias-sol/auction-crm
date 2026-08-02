@@ -56,7 +56,8 @@ class ImportBatch(models.Model):
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
         null=True, blank=True, related_name='import_batches'
     )
-
+    class Meta:
+        verbose_name_plural = "Import batches"
     def __str__(self):
         return self.batchName or self.fileName
 

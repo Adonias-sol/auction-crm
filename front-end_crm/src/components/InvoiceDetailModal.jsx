@@ -8,7 +8,7 @@ export default function InvoiceDetailModal({ invoice, role, onClose, onGenerateP
   const [showGenerate, setShowGenerate] = useState(false);
   if (!invoice) return null;
   const locked = LOCKED_STATUSES.includes(invoice.status);
-  const canGeneratePdf = PDF  _ROLES.includes(role) && !LOCKED_STATUSES.includes(invoice.status);
+  const canGeneratePdf = PDF_ROLES.includes(role) && !LOCKED_STATUSES.includes(invoice.status);
   const otherActions = actionDefsFor(invoice).filter((b) => b.label !== "Generate invoice PDF");
   return (
     <div className="overlay active" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>

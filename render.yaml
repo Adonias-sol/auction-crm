@@ -30,3 +30,29 @@ services:
         sync: false
       - key: BOOTSTRAP_ADMIN_EMAIL
         sync: false
+
+  # New: the frontend, as a static site build out of front-end_crm/.
+  # rootDir matches your actual folder name (front-end_crm, not
+  # "frontend" — that was the original plan's guess, your repo uses
+  # something different).
+  - type: web
+    name: auction-crm-frontend
+    runtime: static
+    rootDir: front-end_crm
+    buildCommand: "npm install && npm run build"
+    staticPublishPath: dist
+    envVars:
+      # Baked into the build at build time (Vite env vars are compiled
+      # in, not read at runtime) — this is what api.js's
+      # import.meta.env.VITE_API_BASE picks up once deployed, so the
+      # frontend calls your real backend instead of a relative /api path.
+      - key: VITE_API_BASE
+        value: "https://auction-crm-api.onrender.com"
+    routes:
+      # Not strictly needed by this app right now — it does all page
+      # switching with React state, not real URL routes, so there's
+      # only ever one real path. Harmless standard boilerplate to have
+      # in place in case that changes later.
+      - type: rewrite
+        source: /*
+        destination: /index.html

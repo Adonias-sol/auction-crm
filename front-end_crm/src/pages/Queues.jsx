@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { money } from "../data";
-import Stamp from "../components/stamp";
+import Stamp from "../components/Stamp";
 
 // BUG FIX from the original file: the "missing" queue used to compare
 // dueDate against a hardcoded literal string ("2026-07-24"), which only

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { statusLabels, canChangeStatus } from "../data";
-import Stamp from "./stamp";
+import Stamp from "./Stamp";
 
 export default function StatusCell({ invoice, role, onChangeStatus }) {
   const [editing, setEditing] = useState(false);

@@ -1,39 +1,114 @@
-import { useState } from "react";
-import { periodLabels, receivedByPeriod, statusCountsByPeriod, statusLabels, money } from "../data";
+import { useState, useEffect } from "react";
+import { periodLabels, statusLabels, money } from "../data";
 import PeriodDropdown from "../components/PeriodDropdown";
+import { apiCall } from "../api";
 
-const revenueByAuction = [["Spring Classic Cars", 88, "92,400.00"], ["Estate Jewelry Lot 12", 64, "67,150.00"], ["Vintage Watches", 51, "53,900.00"], ["Modern Art Sale", 40, "41,700.00"], ["Rare Books", 27, "29,500.00"]];
-const revenueByClient = [["Whitfield Holdings", 70, "38,200.00"], ["Marchetti Estates", 55, "29,800.00"], ["R. Delgado", 38, "20,400.00"]];
-
-export default function Dashboard() {
+export default function Dashboard({ token }) {
   const [receivedPeriod, setReceivedPeriod] = useState("today");
   const [statusPeriod, setStatusPeriod] = useState("today");
-  const statusCounts = statusCountsByPeriod[statusPeriod];
+  const [stats, setStats] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, [receivedPeriod, statusPeriod, token]);
+
+  async function fetchDashboardData() {
+    try {
+      setLoading(true);
+      const response = await apiCall('/api/invoices/summary/', {
+        method: 'GET',
+        headers: token ? { Authorization: `Token ${token}` } : {},
+      });
+
+      if (!response.ok) {
+        setError('Failed to load dashboard');
+        return;
+      }
+
+      const data = await response.json();
+      setStats(data);
+      setError("");
+    } catch (err) {
+      setError('Network error loading dashboard');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  if (loading) return <div style={{ padding: 20 }}>Loading dashboard...</div>;
+  if (error) return <div style={{ padding: 20, color: 'red' }}>{error}</div>;
+
+  // Compute stats from real invoices
+  const invoices = stats?.invoices || [];
+  const totalCollected = invoices
+    .filter(inv => ['paid', 'waived'].includes(inv.status))
+    .reduce((sum, inv) => sum + parseFloat(inv.totalAmount || 0), 0);
+  
+  const outstanding = invoices
+    .filter(inv => !['paid', 'waived', 'cancelled'].includes(inv.status))
+    .reduce((sum, inv) => sum + parseFloat(inv.totalAmount || 0), 0);
+  
+  const unpaidCount = invoices.filter(inv => 
+    !['paid', 'waived', 'cancelled'].includes(inv.status)
+  ).length;
+
+  // Group by status
+  const statusCounts = Object.keys(statusLabels).reduce((acc, key) => {
+    acc[key] = invoices.filter(inv => inv.status === key).length;
+    return acc;
+  }, {});
+
+  // Top auctions by revenue
+  const auctionRevenue = {};
+  invoices.forEach(inv => {
+    const auctionName = inv.lots?.[0]?.auctionName || 'Unknown';
+    auctionRevenue[auctionName] = (auctionRevenue[auctionName] || 0) + parseFloat(inv.totalAmount || 0);
+  });
+  const topAuctions = Object.entries(auctionRevenue)
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, 5)
+    .map(([name, total]) => [name, Math.round(total / Math.max(...Object.values(auctionRevenue)) * 100), total.toFixed(2)]);
+
+  // Top clients by revenue
+  const clientRevenue = {};
+  invoices.forEach(inv => {
+    const clientName = inv.winner?.companyName || inv.winner?.bidderName || 'Unknown';
+    clientRevenue[clientName] = (clientRevenue[clientName] || 0) + parseFloat(inv.totalAmount || 0);
+  });
+  const topClients = Object.entries(clientRevenue)
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, 3)
+    .map(([name, total]) => [name, Math.round(total / Math.max(...Object.values(clientRevenue)) * 100), total.toFixed(2)]);
+
+  const collectionPct = totalCollected && (totalCollected / (totalCollected + outstanding) * 100).toFixed(1);
 
   return (
     <div>
       <div className="grid grid-4" style={{ marginBottom: 16 }}>
         <div className="card">
           <div className="stat-label">Total fees collected</div>
-          <div className="stat-value up">ETB 284,650</div>
-          <div className="stat-foot">Across 6 active auctions</div>
+          <div className="stat-value up">ETB {money(totalCollected.toFixed(2))}</div>
+          <div className="stat-foot">Across {invoices.length} invoices</div>
         </div>
         <div className="card">
           <div className="stat-label">Outstanding fees</div>
-          <div className="stat-value warn">ETB 41,200</div>
-          <div className="stat-foot">18 invoices unpaid</div>
+          <div className="stat-value warn">ETB {money(outstanding.toFixed(2))}</div>
+          <div className="stat-foot">{unpaidCount} invoices unpaid</div>
         </div>
         <div className="card">
           <div className="stat-label-row">
-            <div className="stat-label">Received \u2014 {periodLabels[receivedPeriod].toLowerCase()}</div>
+            <div className="stat-label">Received — {periodLabels[receivedPeriod].toLowerCase()}</div>
             <PeriodDropdown value={receivedPeriod} onChange={setReceivedPeriod} />
           </div>
-          <div className="stat-value">{money(receivedByPeriod[receivedPeriod])}</div>
+          <div className="stat-value">ETB {money(totalCollected.toFixed(2))}</div>
           <div className="stat-foot">Payments verified in this period</div>
         </div>
         <div className="card">
           <div className="stat-label">Collection percentage</div>
-          <div className="stat-value up">87.4%</div>
+          <div className="stat-value up">{collectionPct}%</div>
           <div className="stat-foot">of invoiced fees collected</div>
         </div>
       </div>
@@ -56,23 +131,23 @@ export default function Dashboard() {
       <div className="grid grid-2">
         <div className="card">
           <h3 style={{ margin: "0 0 4px" }}>Revenue by auction</h3>
-          {revenueByAuction.map(([name, pct, val]) => (
+          {topAuctions.length ? topAuctions.map(([name, pct, val]) => (
             <div className="bar-row" key={name}>
               <span className="name">{name}</span>
               <div className="bar-track"><div className="bar-fill" style={{ width: pct + "%" }}></div></div>
-              <span className="val">{money(val)}</span>
+              <span className="val">ETB {money(val)}</span>
             </div>
-          ))}
+          )) : <p>No auction data</p>}
         </div>
         <div className="card">
           <h3 style={{ margin: "0 0 4px" }}>Revenue by client</h3>
-          {revenueByClient.map(([name, pct, val]) => (
+          {topClients.length ? topClients.map(([name, pct, val]) => (
             <div className="bar-row" key={name}>
               <span className="name">{name}</span>
               <div className="bar-track"><div className="bar-fill" style={{ width: pct + "%" }}></div></div>
-              <span className="val">{money(val)}</span>
+              <span className="val">ETB {money(val)}</span>
             </div>
-          ))}
+          )) : <p>No client data</p>}
         </div>
       </div>
     </div>

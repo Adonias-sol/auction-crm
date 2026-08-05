@@ -1,30 +1,113 @@
-import { useState } from "react";
-import { batches, money } from "../data";
+import { useState, useEffect } from "react";
+import { money } from "../data";
+import { apiCall } from "../api";
 
-export default function ImportBatches({ role }) {
+export default function ImportBatches({ role, token }) {
   const canImport = role === "administrator" || role === "auction_manager";
   const [company, setCompany] = useState("");
   const [date, setDate] = useState("");
   const [batchName, setBatchName] = useState("");
+  const [file, setFile] = useState(null);
   const [preview, setPreview] = useState(null);
+  const [batches, setBatches] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  function runPreview() {
-    if (!company || !date) { window.alert("Company name and auction date are required."); return; }
-    // TODO: replace with POST /api/import-batches/preview/ (multipart file
-    // + companyName + auctionDate). This sample data mirrors that response shape.
-    setPreview({
-      summary: `3 winners \u00b7 6 lots found in bid_data_report.xlsx for ${company}, ${date}`,
-      rows: [
-        { bidderName: "H. Girma", winnerPhone: "251911223344", lots: 2, totalFee: "362.90", feePercentage: "0.95" },
-        { bidderName: "M. Tesfaye", winnerPhone: "251922334455", lots: 1, totalFee: "122.55", feePercentage: "0.95" },
-        { bidderName: "A. Bekele", winnerPhone: "251933445566", lots: 3, totalFee: "596.60", feePercentage: "0.95" },
-      ],
-    });
+  useEffect(() => {
+    fetchBatches();
+  }, [token]);
+
+  async function fetchBatches() {
+    try {
+      const response = await apiCall('/api/import-batches/', {
+        method: 'GET',
+        headers: token ? { Authorization: `Token ${token}` } : {},
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setBatches(data.results || data);
+      }
+    } catch (err) {
+      console.error('Failed to load batches', err);
+    }
   }
-  function confirmImport() {
-    // TODO: replace with POST /api/import-batches/confirm/
-    window.alert("3 invoices created and added to the batch list below.");
-    setPreview(null);
+
+  async function runPreview() {
+    if (!file || !company || !date) {
+      setError("File, company name, and auction date are required.");
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('companyName', company);
+    formData.append('auctionDate', date);
+    if (batchName) formData.append('batchName', batchName);
+
+    try {
+      const response = await apiCall('/api/import-batches/preview/', {
+        method: 'POST',
+        headers: token ? { Authorization: `Token ${token}` } : {},
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const err = await response.json();
+        setError(err.detail || 'Preview failed');
+        setLoading(false);
+        return;
+      }
+
+      const data = await response.json();
+      setPreview(data);
+    } catch (err) {
+      setError('Network error during preview');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function confirmImport() {
+    setLoading(true);
+    setError("");
+
+    try {
+      const response = await apiCall('/api/import-batches/confirm/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Token ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          batchName: batchName || null,
+          companyName: company,
+          auctionDate: date,
+        }),
+      });
+
+      if (!response.ok) {
+        const err = await response.json();
+        setError(err.detail || 'Confirm failed');
+        setLoading(false);
+        return;
+      }
+
+      await fetchBatches();
+      setPreview(null);
+      setFile(null);
+      setCompany("");
+      setDate("");
+      setBatchName("");
+    } catch (err) {
+      setError('Network error during confirm');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -32,43 +115,68 @@ export default function ImportBatches({ role }) {
       <div className={"card section" + (canImport ? "" : " locked")} style={{ marginBottom: 18 }}>
         <h3 style={{ margin: "0 0 4px" }}>New import batch</h3>
         <div style={{ fontSize: 12.5, color: "var(--text-2)", marginBottom: 16 }}>
-          Upload a bid data report to generate invoices. Only one file is required \u2014 bidder company names are left blank and can be added manually afterward.
+          Upload a bid data report to generate invoices. Only one file is required — bidder company names are left blank and can be added manually afterward.
         </div>
         <div className="upload-form">
           <div className="full">
-            <label>Bid data report <span className="req">*</span> \u2014 .xlsx only</label>
-            <div className="filedrop">bid_data_report.xlsx \u2014 drag file here or click to browse</div>
+            <label>Bid data report <span className="req">*</span> — .xlsx only</label>
+            <div 
+              className="filedrop"
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => {
+                e.preventDefault();
+                setFile(e.dataTransfer.files[0]);
+              }}
+            >
+              {file ? file.name : "bid_data_report.xlsx — drag file here or click to browse"}
+              <input 
+                type="file" 
+                accept=".xlsx" 
+                onChange={(e) => setFile(e.target.files?.[0])}
+                style={{ display: 'none' }}
+              />
+            </div>
           </div>
           <div><label>Company name <span className="req">*</span></label><input value={company} onChange={(e) => setCompany(e.target.value)} placeholder="e.g. Ethio Telecom" /></div>
           <div><label>Auction date <span className="req">*</span></label><input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></div>
           <div className="full"><label>Batch name <span className="opt">(optional)</span></label><input value={batchName} onChange={(e) => setBatchName(e.target.value)} placeholder="e.g. Ethio Telecom Q4 2026" /></div>
         </div>
+        {error && <div style={{ color: 'red', marginTop: 8, fontSize: 12 }}>{error}</div>}
         <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
-          <button className="btn btn-primary" onClick={runPreview}>Preview import</button>
+          <button className="btn btn-primary" onClick={runPreview} disabled={loading}>
+            {loading ? 'Loading...' : 'Preview import'}
+          </button>
         </div>
       </div>
       {!canImport && <div className="locked-note" style={{ marginTop: -10, marginBottom: 18 }}>Only Administrators and Auction Managers can start a new import. You can still review past batches below.</div>}
 
       {preview && (
         <div className="card" style={{ marginBottom: 18 }}>
-          <h3 style={{ margin: "0 0 4px" }}>Preview \u2014 nothing saved yet</h3>
-          <div style={{ fontSize: 12.5, color: "var(--text-2)", marginBottom: 14 }}>{preview.summary}</div>
+          <h3 style={{ margin: "0 0 4px" }}>Preview — nothing saved yet</h3>
+          <div style={{ fontSize: 12.5, color: "var(--text-2)", marginBottom: 14 }}>
+            {preview.summary || `${preview.winners?.length || 0} winners · ${preview.lots?.length || 0} lots found`}
+          </div>
           <div className="tbl-wrap" style={{ marginBottom: 14 }}>
             <table>
               <thead><tr><th>Bidder</th><th>Phone</th><th>Lots</th><th>Total fee</th><th>Fee %</th></tr></thead>
               <tbody>
-                {preview.rows.map((w, i) => (
+                {(preview.winners || []).map((w, i) => (
                   <tr key={i}>
-                    <td>{w.bidderName}</td><td className="mono">{w.winnerPhone}</td><td className="mono">{w.lots}</td>
-                    <td className="amount">{money(w.totalFee)}</td><td className="mono">{w.feePercentage}%</td>
+                    <td>{w.bidderName}</td>
+                    <td className="mono">{w.winnerPhone}</td>
+                    <td className="mono">{w.lots?.length || 1}</td>
+                    <td className="amount">ETB {money((w.totalFee || 0).toFixed(2))}</td>
+                    <td className="mono">{(w.feePercentage || 0.95).toFixed(2)}%</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-          <div className="locked-note" style={{ marginBottom: 14 }}>Fee % is editable per winner before confirming \u2014 click a row to adjust.</div>
+          <div className="locked-note" style={{ marginBottom: 14 }}>Fee % is editable per winner before confirming — click a row to adjust.</div>
           <div style={{ display: "flex", gap: 8 }}>
-            <button className="btn btn-brass" onClick={confirmImport}>Confirm &amp; create invoices</button>
+            <button className="btn btn-brass" onClick={confirmImport} disabled={loading}>
+              {loading ? 'Confirming...' : 'Confirm & create invoices'}
+            </button>
             <button className="btn btn-ghost" onClick={() => setPreview(null)}>Discard preview</button>
           </div>
         </div>
@@ -76,22 +184,22 @@ export default function ImportBatches({ role }) {
 
       <div className="tbl-wrap">
         <div style={{ overflowX: "auto" }}>
-        <table>
-          <thead><tr><th>Batch</th><th>Company</th><th>Auction date</th><th>Uploaded</th><th>Records</th><th>Status</th><th>Imported by</th></tr></thead>
-          <tbody>
-            {batches.map((b) => (
-              <tr key={b.id}>
-                <td>{b.batchName || <span style={{ color: "var(--text-3)" }}>\u2014</span>}<div style={{ fontSize: 11, color: "var(--text-3)" }} className="mono">{b.fileName}</div></td>
-                <td>{b.companyName}</td>
-                <td className="mono">{b.auctionDate}</td>
-                <td className="mono">{b.uploadDate}</td>
-                <td className="mono">{b.validRecords}/{b.totalRecords}</td>
-                <td><span className="stamp paid" style={{ transform: "none" }}>{b.status}</span></td>
-                <td>{b.importedBy}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+          <table>
+            <thead><tr><th>Batch</th><th>Company</th><th>Auction date</th><th>Uploaded</th><th>Records</th><th>Status</th><th>Imported by</th></tr></thead>
+            <tbody>
+              {batches.map((b) => (
+                <tr key={b.id}>
+                  <td>{b.batchName || <span style={{ color: "var(--text-3)" }}>—</span>}<div style={{ fontSize: 11, color: "var(--text-3)" }} className="mono">{b.fileName}</div></td>
+                  <td>{b.companyName}</td>
+                  <td className="mono">{new Date(b.auctionDate).toLocaleDateString()}</td>
+                  <td className="mono">{new Date(b.uploadDate).toLocaleDateString()}</td>
+                  <td className="mono">{b.validRecords}/{b.totalRecords}</td>
+                  <td><span className="stamp paid" style={{ transform: "none" }}>{b.status}</span></td>
+                  <td>{b.importedBy}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>

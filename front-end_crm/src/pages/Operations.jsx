@@ -1,15 +1,50 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { LOCKED_STATUSES, PDF_ROLES, searchFieldDefs, money } from "../data";
 import { ActionBtn } from "../components/ActionButton";
 import StatusCell from "../components/StatusCell";
 import GeneratePdfModal from "../components/GeneratePdfModal";
+import { apiCall } from "../api";
 
-export default function Operations({ invoices, setInvoices, role, onOpenDetail, onGeneratePdf }) {
+export default function Operations({ role, token, onOpenDetail }) {
   const [searchField, setSearchField] = useState("bidderName");
   const [searchValue, setSearchValue] = useState("");
   const [searchValueTo, setSearchValueTo] = useState("");
   const [filtered, setFiltered] = useState(null);
   const [selected, setSelected] = useState([]);
+  const [invoices, setInvoices] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [showGenerateModal, setShowGenerateModal] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize] = useState(20);
+
+  useEffect(() => {
+    fetchInvoices();
+  }, [currentPage, token]);
+
+  async function fetchInvoices() {
+    try {
+      setLoading(true);
+      const response = await apiCall(`/api/invoices/?page=${currentPage}`, {
+        method: 'GET',
+        headers: token ? { Authorization: `Token ${token}` } : {},
+      });
+
+      if (!response.ok) {
+        setError('Failed to load invoices');
+        return;
+      }
+
+      const data = await response.json();
+      setInvoices(data.results || data);
+      setError("");
+    } catch (err) {
+      setError('Network error loading invoices');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   const rows = filtered || invoices;
   const searchDef = searchFieldDefs[searchField];
@@ -31,35 +66,89 @@ export default function Operations({ invoices, setInvoices, role, onOpenDetail, 
         case "phoneNumber": return inv.winnerPhone.includes(val);
         case "companyName": return (inv.companyName || "").toLowerCase().includes(val);
         case "lotNo": return inv.lots.some((l) => l.lotNumber.toLowerCase().includes(val));
-        case "batchId": return String(inv.batchId) === val;
+        case "batchId": return String(inv.importBatch) === val;
         case "status": return inv.status === val;
         default: return true;
       }
     }));
   }
+
   function clearSearch() {
-    setSearchField("bidderName"); setSearchValue(""); setSearchValueTo(""); setFiltered(null);
+    setSearchField("bidderName");
+    setSearchValue("");
+    setSearchValueTo("");
+    setFiltered(null);
   }
 
-  function toggleRow(inv) {
-    setSelected((s) => s.includes(inv) ? s.filter((x) => x !== inv) : [...s, inv]);
+  function toggleRow(invId) {
+    setSelected((s) => s.includes(invId) ? s.filter((x) => x !== invId) : [...s, invId]);
   }
+
   function toggleAll() {
-    setSelected(selected.length === rows.length ? [] : rows.map((r) => r.inv));
+    setSelected(selected.length === rows.length ? [] : rows.map((r) => r.id));
   }
 
-  function changeStatus(invNumber, newStatus) {
-    setInvoices((prev) => prev.map((inv) => inv.inv === invNumber ? { ...inv, status: newStatus } : inv));
+  async function changeStatus(invId, newStatus) {
+    try {
+      const response = await apiCall(`/api/invoices/${invId}/change-status/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Token ${token}` } : {}),
+        },
+        body: JSON.stringify({ status: newStatus }),
+      });
+
+      if (response.ok) {
+        await fetchInvoices();
+      } else {
+        setError('Failed to update status');
+      }
+    } catch (err) {
+      setError('Network error updating status');
+      console.error(err);
+    }
   }
 
-  const [showGenerateModal, setShowGenerateModal] = useState(false);
-  const eligibleForPdf = invoices.filter((inv) => selected.includes(inv.inv) && !LOCKED_STATUSES.includes(inv.status));
+  const eligibleForPdf = invoices.filter((inv) => 
+    selected.includes(inv.id) && !LOCKED_STATUSES.includes(inv.status)
+  );
 
   function openGenerateModal() {
-    if (selected.length === 0) { window.alert("Select at least one invoice first."); return; }
-    if (eligibleForPdf.length === 0) { window.alert("None of the selected invoices are eligible \u2014 Paid, Cancelled, and Waived invoices can't have a new PDF generated."); return; }
+    if (selected.length === 0) {
+      window.alert("Select at least one invoice first.");
+      return;
+    }
+    if (eligibleForPdf.length === 0) {
+      window.alert("None of the selected invoices are eligible — Paid, Cancelled, and Waived invoices can't have a new PDF generated.");
+      return;
+    }
     setShowGenerateModal(true);
   }
+
+  async function confirmGeneratePdf(percentagesByInvId) {
+    try {
+      for (const [invId, pct] of Object.entries(percentagesByInvId)) {
+        await apiCall(`/api/invoices/${invId}/generate-pdf/`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Token ${token}` } : {}),
+          },
+          body: JSON.stringify({ feePercentage: parseFloat(pct) }),
+        });
+      }
+      await fetchInvoices();
+      setSelected([]);
+      setShowGenerateModal(false);
+    } catch (err) {
+      setError('Failed to generate PDFs');
+      console.error(err);
+    }
+  }
+
+  if (loading) return <div style={{ padding: 20 }}>Loading invoices...</div>;
+  if (error) return <div style={{ padding: 20, color: 'red' }}>{error}</div>;
 
   return (
     <div>
@@ -102,49 +191,51 @@ export default function Operations({ invoices, setInvoices, role, onOpenDetail, 
 
       <div className="tbl-wrap">
         <div style={{ overflowX: "auto" }}>
-        <table>
-          <thead>
-            <tr>
-              <th style={{ width: 32 }}>
-                {canGeneratePdf && <input type="checkbox" checked={rows.length > 0 && selected.length === rows.length} onChange={toggleAll} />}
-              </th>
-              <th>Invoice #</th><th>Bidder</th><th>Company</th><th>Lots</th><th>Total amount</th><th>Due date</th><th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.length === 0 && <tr><td colSpan={8} style={{ textAlign: "center", color: "var(--text-3)", padding: 28 }}>No records match that search</td></tr>}
-            {rows.map((inv) => (
-              <tr key={inv.inv}>
-                <td>
-                  {canGeneratePdf && <input type="checkbox" checked={selected.includes(inv.inv)} onChange={() => toggleRow(inv.inv)} />}
-                </td>
-                <td className="mono" style={{ cursor: "pointer" }} onClick={() => onOpenDetail(inv.inv)}>{inv.inv}</td>
-                <td>{inv.bidderName}</td>
-                <td>{inv.companyName || <span style={{ color: "var(--text-3)" }}>\u2014</span>}</td>
-                <td className="mono">{inv.lots.length}</td>
-                <td className="amount">{money(inv.totalAmount)}</td>
-                <td className="mono">{inv.dueDate}</td>
-                <td><StatusCell invoice={inv} role={role} onChangeStatus={changeStatus} /></td>
+          <table>
+            <thead>
+              <tr>
+                <th style={{ width: 32 }}>
+                  {canGeneratePdf && <input type="checkbox" checked={rows.length > 0 && selected.length === rows.length} onChange={toggleAll} />}
+                </th>
+                <th>Invoice #</th><th>Bidder</th><th>Company</th><th>Lots</th><th>Total amount</th><th>Due date</th><th>Status</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {rows.length === 0 && <tr><td colSpan={8} style={{ textAlign: "center", color: "var(--text-3)", padding: 28 }}>No records match that search</td></tr>}
+              {rows.map((inv) => (
+                <tr key={inv.id}>
+                  <td>
+                    {canGeneratePdf && <input type="checkbox" checked={selected.includes(inv.id)} onChange={() => toggleRow(inv.id)} />}
+                  </td>
+                  <td className="mono" style={{ cursor: "pointer" }} onClick={() => onOpenDetail(inv.id)}>{inv.invoiceNumber}</td>
+                  <td>{inv.bidderName}</td>
+                  <td>{inv.companyName || <span style={{ color: "var(--text-3)" }}>—</span>}</td>
+                  <td className="mono">{inv.lots?.length || 0}</td>
+                  <td className="amount">ETB {money(inv.totalAmount.toFixed(2))}</td>
+                  <td className="mono">{new Date(inv.dueDate).toLocaleDateString()}</td>
+                  <td><StatusCell invoice={inv} role={role} onChangeStatus={changeStatus} /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
         <div className="pagination">
-          <span>Showing 1\u2013{rows.length} of 1,240</span>
+          <span>Showing {invoices.length} records</span>
           <div className="btns">
-            <button className="btn btn-sm" disabled>Previous</button>
-            <button className="btn btn-sm">Next</button>
+            <button className="btn btn-sm" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}>Previous</button>
+            <button className="btn btn-sm" onClick={() => setCurrentPage(p => p + 1)}>Next</button>
           </div>
         </div>
       </div>
+
       <div className="locked-note" style={{ marginTop: 10 }}>
-        Click an invoice number to open its full record. Click a status badge to change it directly \u2014 only available to roles allowed to make that change.
+        Click an invoice number to open its full record. Click a status badge to change it directly — only available to roles allowed to make that change.
       </div>
+
       {showGenerateModal && (
         <GeneratePdfModal
           invoices={eligibleForPdf}
-          onConfirm={(pcts) => { onGeneratePdf(pcts); setSelected([]); }}
+          onConfirm={confirmGeneratePdf}
           onClose={() => setShowGenerateModal(false)}
         />
       )}

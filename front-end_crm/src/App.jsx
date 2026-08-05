@@ -82,7 +82,9 @@ export default function App() {
       />
       <div className="main">
         <div className="page active">
-          {page === "dashboard" && <Dashboard />}
+          {page === "dashboard" && (
+            <Dashboard token={session.token} />
+          )}
           {page === "import" && (
             <ImportBatches
               role={session.role}
@@ -90,15 +92,12 @@ export default function App() {
             />
             )}
           {page === "operations" && (
-            <Operations
-              invoices={invoices}
-              setInvoices={setInvoices}
-              role={session.role}
-              token={session.token}
-              onOpenDetail={setDetailInvNumber}
-              onGeneratePdf={generateInvoicePdfs}
-            />
-          )}
+          <Operations
+            role={session.role}
+            token={session.token}
+            onOpenDetail={setDetailInvNumber}
+          />
+        )}
           {page === "queues" && (
             <Queues
               invoices={invoices}

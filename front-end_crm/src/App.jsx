@@ -97,24 +97,10 @@ export default function App() {
             token={session.token}
             onOpenDetail={setDetailInvNumber}
           />
-        )}
-          {page === "queues" && (
-            <Queues
-              invoices={invoices}
-              token={session.token}
-            />
-          )}
-          {page === "reports" && (
-            <Reports
-              role={session.role}
-              token={session.token}
-            />
-              )}
-          {page === "audit" && (
-            <AuditTrail
-              token={session.token}
-            />
-          )}
+            )}
+          {page === "queues" && <Queues token={session.token} />}
+          {page === "reports" && <Reports role={session.role} token={session.token} />}
+          {page === "audit" && <AuditTrail token={session.token} />}
         </div>  
       </div>
       <InvoiceDetailModal

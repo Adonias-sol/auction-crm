@@ -1,25 +1,54 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { money } from "../data";
 import Stamp from "../components/Stamp";
+import { apiCall } from "../api";
 
-// BUG FIX from the original file: the "missing" queue used to compare
-// dueDate against a hardcoded literal string ("2026-07-24"), which only
-// happened to work because "today" was after that date. Computing it live
-// instead so this queue is still correct next month, not just this week.
 function todayISO() {
   return new Date().toISOString().slice(0, 10);
 }
 
 const queueDefs = [
-  { key: "pending",label: "Pending processing fee payments", filter: (inv) => inv.status === "invoice_generated" || inv.status === "pending_payment" },
+  { key: "pending", label: "Pending processing fee payments", filter: (inv) => inv.status === "invoice_generated" || inv.status === "pending_payment" },
   { key: "verify", label: "Payment verification queue", filter: (inv) => inv.status === "payment_submitted" || inv.status === "under_verification" },
   { key: "overdue", label: "Overdue payments", filter: (inv) => inv.status === "overdue" },
   { key: "missing", label: "Receipt missing", filter: (inv) => inv.status === "invoice_generated" && inv.dueDate < todayISO() },
   { key: "recent", label: "Recently paid", filter: (inv) => inv.status === "paid" },
 ];
 
-export default function Queues({ invoices }) {
+export default function Queues({ token }) {
+  const [invoices, setInvoices] = useState([]);
   const [active, setActive] = useState("pending");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    fetchInvoices();
+  }, [token]);
+
+  async function fetchInvoices() {
+    try {
+      const response = await apiCall('/api/invoices/', {
+        method: 'GET',
+        headers: token ? { Authorization: `Token ${token}` } : {},
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setInvoices(data.results || data);
+      } else {
+        setError('Failed to load invoices');
+      }
+    } catch (err) {
+      setError('Network error');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  if (loading) return <div style={{ padding: 20 }}>Loading queues...</div>;
+  if (error) return <div style={{ padding: 20, color: 'red' }}>{error}</div>;
+
   const activeDef = queueDefs.find((q) => q.key === active);
   const rows = invoices.filter(activeDef.filter);
 
@@ -35,25 +64,25 @@ export default function Queues({ invoices }) {
           );
         })}
       </div>
-      {active === "missing" && <div className="queue-note">Invoices still in "Invoice Generated" status past their due date \u2014 no receipt was ever submitted.</div>}
+      {active === "missing" && <div className="queue-note">Invoices still in "Invoice Generated" status past their due date — no receipt was ever submitted.</div>}
       <div className="tbl-wrap">
         <div style={{ overflowX: "auto" }}>
-        <table>
-          <thead><tr><th>Invoice #</th><th>Bidder</th><th>Lots</th><th>Total amount</th><th>Due date</th><th>Status</th></tr></thead>
-          <tbody>
-            {rows.length === 0 && <tr><td colSpan={6} style={{ color: "var(--text-3)", textAlign: "center", padding: 24 }}>Nothing in this queue right now</td></tr>}
-            {rows.map((inv) => (
-              <tr key={inv.inv}>
-                <td className="mono">{inv.inv}</td>
-                <td>{inv.bidderName}</td>
-                <td className="mono">{inv.lots.length}</td>
-                <td className="amount">{money(inv.totalAmount)}</td>
-                <td className="mono">{inv.dueDate}</td>
-                <td><Stamp status={inv.status} /></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+          <table>
+            <thead><tr><th>Invoice #</th><th>Bidder</th><th>Lots</th><th>Total amount</th><th>Due date</th><th>Status</th></tr></thead>
+            <tbody>
+              {rows.length === 0 && <tr><td colSpan={6} style={{ color: "var(--text-3)", textAlign: "center", padding: 24 }}>Nothing in this queue right now</td></tr>}
+              {rows.map((inv) => (
+                <tr key={inv.id}>
+                  <td className="mono">{inv.invoiceNumber}</td>
+                  <td>{inv.bidderName}</td>
+                  <td className="mono">{inv.lots?.length || 0}</td>
+                  <td className="amount">ETB {money(inv.totalAmount.toFixed(2))}</td>
+                  <td className="mono">{new Date(inv.dueDate).toLocaleDateString()}</td>
+                  <td><Stamp status={inv.status} /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>

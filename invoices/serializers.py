@@ -1,3 +1,4 @@
+from django.contrib.auth import authenticate
 from rest_framework import serializers
 
 from .models import (
@@ -193,3 +194,44 @@ class InvoiceDetailSerializer(InvoiceWinnerFieldsMixin, serializers.ModelSeriali
     def get_verifiedBy(self, obj):
         latest = obj.payments.filter(paymentStatus='verified').order_by('-verifiedDate').first()
         return user_display_name(latest.verifiedBy) if latest else ''
+
+# ================================================================= Auth (Login)
+
+class LoginSerializer(serializers.Serializer):
+    """
+    Handles POST /api/auth/login/ — accepts username and password,
+    returns token, username, and role.
+    """
+    username = serializers.CharField(required=True)
+    password = serializers.CharField(required=True, write_only=True)
+
+    def validate(self, data):
+        username = data.get('username')
+        password = data.get('password')
+
+        if not username or not password:
+            raise serializers.ValidationError("Username and password are required.")
+
+        user = authenticate(username=username, password=password)
+        if not user:
+            raise serializers.ValidationError("Invalid username or password.")
+
+        # Ensure StaffProfile exists
+        if not hasattr(user, 'profile'):
+            raise serializers.ValidationError("User does not have a staff profile.")
+
+        data['user'] = user
+        return data
+
+    def create(self, validated_data):
+        # This method is called by the view after validation passes
+        user = validated_data['user']
+        # Get or create the token
+        from rest_framework.authtoken.models import Token
+        token, _ = Token.objects.get_or_create(user=user)
+        
+        return {
+            'token': token.key,
+            'username': user.get_username(),
+            'role': user.profile.role,
+        }

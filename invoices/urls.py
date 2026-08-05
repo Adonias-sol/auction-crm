@@ -3,8 +3,9 @@ from rest_framework.routers import DefaultRouter
 
 from .views import (
     AuctionViewSet, WinnerViewSet, InvoiceViewSet,
-    AttachmentDeleteView, AuditLogListView, FeeConfigView,
+    AttachmentDeleteView, AuditLogListView, FeeConfigView,LoginView,
 )
+
 from .import_views import (
     ImportBatchViewSet, ImportBatchPreviewView, ImportBatchConfirmView,
 )
@@ -16,6 +17,7 @@ router.register(r'invoices', InvoiceViewSet, basename='invoice')
 router.register(r'import-batches', ImportBatchViewSet, basename='import-batch')
 
 urlpatterns = [
+    path('auth/login/', LoginView.as_view(), name='login'),
     # Literal paths come BEFORE the router to prevent DRF route collision
     path('import-batches/preview/', ImportBatchPreviewView.as_view(), name='import-batch-preview'),
     path('import-batches/confirm/', ImportBatchConfirmView.as_view(), name='import-batch-confirm'),

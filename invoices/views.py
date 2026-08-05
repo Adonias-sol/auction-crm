@@ -3,10 +3,12 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import viewsets, generics, status
 from rest_framework.decorators import action
-from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response    
+from rest_framework.views import APIView
+from rest_framework.permissions import IsAuthenticated , AllowAny
 from rest_framework.pagination import PageNumberPagination
 from .pagination import StandardPagination
+
 
 from .models import (
     Auction, Winner, Invoice, InvoiceLot, Payment, Attachment, FeeConfig, AuditLog,
@@ -14,7 +16,7 @@ from .models import (
 from .serializers import (
     AuctionSerializer, WinnerSerializer, InvoiceListSerializer,
     InvoiceDetailSerializer, PaymentSerializer, AttachmentSerializer,
-    AuditLogSerializer, FeeConfigSerializer,
+    AuditLogSerializer, FeeConfigSerializer,LoginSerializer,
 )
 from .permissions import ReadOnlyForViewer, ActionPermissionMap, can_transition, has_permission
 
@@ -328,3 +330,20 @@ class FeeConfigView(generics.GenericAPIView):
         FeeConfig.objects.filter(isActive=True).update(isActive=False)
         config = FeeConfig.objects.create(percentage=percentage, configuredBy=request.user, isActive=True)
         return Response(FeeConfigSerializer(config).data)
+
+# ================================================================= Auth View
+
+class LoginView(APIView):
+    """
+    POST /api/auth/login/
+    Body: {username, password}
+    Returns: {token, username, role}
+    """
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = LoginSerializer(data=request.data)
+        if serializer.is_valid():
+            result = serializer.create(serializer.validated_data)
+            return Response(result, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

@@ -4,6 +4,7 @@
 import { useState } from "react";
 import { demoAccounts } from "../data";
 import logo from "../logo";
+import { API_BASE } from "../api";
 
 export default function Login({ onLogin }) {
   const [username, setUsername] = useState("");
@@ -11,15 +12,34 @@ export default function Login({ onLogin }) {
   const [remember, setRemember] = useState(false);
   const [error, setError] = useState("");
 
-  function attemptLogin() {
-    const match = demoAccounts.find((a) => a.username === username.trim().toLowerCase() && a.password === password);
-    if (!match) { setError("Incorrect username or password."); return; }
-    setError("");
-    // TODO: this is still the hardcoded demo check. Replace with a real
-    // POST /api/auth/login/ call once that backend endpoint exists.
-    onLogin(match.role, match.username, remember);
+  async function attemptLogin() {
+  setError("");
+  
+  if (!username.trim() || !password) {
+    setError("Username and password required.");
+    return;
   }
 
+  try {
+    const response = await fetch(`${API_BASE}/api/auth/login/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username: username.trim(), password }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      setError(errorData.non_field_errors?.[0] || "Login failed");
+      return;
+    }
+
+    const data = await response.json();
+    sessionStorage.setItem('authToken', data.token); 
+    onLogin(data.role, data.username, data.token, remember);
+  } catch (err) {
+    setError("Network error. Please try again.");
+  }
+}
   function handleKeyDown(e) {
     if (e.key === "Enter") attemptLogin();
   }

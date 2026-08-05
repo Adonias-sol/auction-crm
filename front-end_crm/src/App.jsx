@@ -16,7 +16,7 @@ import AuditTrail from "./pages/AuditTrail";
 
 export default function App() {
   const [page, setPage] = useState("dashboard");
-  const [session, setSession] = useState(null); // { role, username } | null
+  const [session, setSession] = useState(null); // { role, username ,token} | null
   const [theme, setTheme] = useState("light");
   const [showAccountSettings, setShowAccountSettings] = useState(false);
   const [invoices, setInvoices] = useState(invoicesSeed);
@@ -50,11 +50,15 @@ export default function App() {
     setDetailInvNumber(null);
   }
 
-  function handleLogin(role, username, remember) {
-    // TODO: real persistence (cookie/localStorage) once wired to a real
-    // login endpoint — "remember" only holds for the current session for now.
-    setSession({ role, username });
-  }
+  function handleLogin(role, username, token, remember) {
+  setSession({
+    role,
+    username,
+    token,
+  });
+
+  // TODO: if remember=true, store token in localStorage
+}
 
   function handleSaveProfile(newUsername) {
     setSession((s) => ({ ...s, username: newUsername }));
@@ -79,27 +83,48 @@ export default function App() {
       <div className="main">
         <div className="page active">
           {page === "dashboard" && <Dashboard />}
-          {page === "import" && <ImportBatches role={session.role} />}
+          {page === "import" && (
+            <ImportBatches
+              role={session.role}
+              token={session.token}
+            />
+            )}
           {page === "operations" && (
             <Operations
               invoices={invoices}
               setInvoices={setInvoices}
               role={session.role}
+              token={session.token}
               onOpenDetail={setDetailInvNumber}
               onGeneratePdf={generateInvoicePdfs}
             />
           )}
-          {page === "queues" && <Queues invoices={invoices} />}
-          {page === "reports" && <Reports role={session.role} />}
-          {page === "audit" && <AuditTrail />}
-        </div>
+          {page === "queues" && (
+            <Queues
+              invoices={invoices}
+              token={session.token}
+            />
+          )}
+          {page === "reports" && (
+            <Reports
+              role={session.role}
+              token={session.token}
+            />
+              )}
+          {page === "audit" && (
+            <AuditTrail
+              token={session.token}
+            />
+          )}
+        </div>  
       </div>
       <InvoiceDetailModal
-        invoice={detailInvoice}
-        role={session.role}
-        onClose={() => setDetailInvNumber(null)}
-        onGeneratePdf={generateInvoicePdfs}
-      />
+          invoice={detailInvoice}
+          role={session.role}
+          token={session.token}
+          onClose={() => setDetailInvNumber(null)}
+          onGeneratePdf={generateInvoicePdfs}
+        />
       {showAccountSettings && (
         <AccountSettingsModal
           username={session.username}

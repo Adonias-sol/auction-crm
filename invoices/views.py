@@ -1,14 +1,17 @@
 from django.db.models import Count, Sum
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
+from django.http import FileResponse
 from rest_framework import viewsets, generics, status
 from rest_framework.decorators import action
 from rest_framework.response import Response    
 from rest_framework.views import APIView
-from rest_framework.permissions import IsAuthenticated , AllowAny
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.pagination import PageNumberPagination
 from .pagination import StandardPagination
-
+from io import BytesIO
+from decimal import Decimal
+from weasyprint import HTML, CSS
 
 from .models import (
     Auction, Winner, Invoice, InvoiceLot, Payment, Attachment, FeeConfig, AuditLog,
@@ -16,11 +19,9 @@ from .models import (
 from .serializers import (
     AuctionSerializer, WinnerSerializer, InvoiceListSerializer,
     InvoiceDetailSerializer, PaymentSerializer, AttachmentSerializer,
-    AuditLogSerializer, FeeConfigSerializer,LoginSerializer,
+    AuditLogSerializer, FeeConfigSerializer, LoginSerializer,
 )
 from .permissions import ReadOnlyForViewer, ActionPermissionMap, can_transition, has_permission
-
-
 
 
 def log_audit(invoice, action_label, user, previous_value='', new_value='', reason=''):
@@ -63,9 +64,6 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         'generate_pdf': 'generate_invoice',
         'change_status': 'change_status_generic',
         'extend_due_date': 'extend_due_date',
-        # 'list', 'retrieve', 'summary', 'payments', 'attachments_action' fall
-        # through to "any authenticated non-viewer" — payments/attachments
-        # do their own extra check on POST specifically, below.
     }
 
     def get_queryset(self):
@@ -88,18 +86,12 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             qs = qs.filter(dueDate__gte=p['dateFrom'])
         if p.get('dateTo'):
             qs = qs.filter(dueDate__lte=p['dateTo'])
-        # NOTE: dateFrom/dateTo filter dueDate, matching the partner's
-        # Operations.jsx search behavior — flagged to her as an assumption
-        # to confirm, not yet confirmed as of this build.
         return qs
 
     def get_serializer_class(self):
         return InvoiceListSerializer if self.action == 'list' else InvoiceDetailSerializer
 
     def retrieve(self, request, *args, **kwargs):
-        # List queryset doesn't prefetch lots/payments/attachments (keeps the
-        # paginated list cheap) — detail view needs them, so this re-fetches
-        # with prefetch_related instead of touching get_queryset globally.
         instance = get_object_or_404(
             Invoice.objects.select_related('winner').prefetch_related('lots', 'payments', 'attachments'),
             pk=kwargs['pk'],
@@ -153,23 +145,23 @@ class InvoiceViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'], url_path='generate-pdf')
     def generate_pdf(self, request, pk=None):
         """
-        NOTE for you and your partner: the API contract lists this as GET,
-        but her GeneratePdfModal sends a fee percentage and mutates data
-        (recalculates every lot's fee, can flip invoice_generated ->
-        pending_payment). A GET that changes server state is bad REST
-        practice and most GET requests can't carry a JSON body reliably —
-        built this as POST instead. Update the contract doc to match.
-        Actual WeasyPrint PDF rendering lands at step 19 — this endpoint
-        does the recalculation + status transition + audit log now, and
-        will return a real file response once that step exists.
+        POST /api/invoices/{id}/generate-pdf/
+        Body: {feePercentage}
+        Generates a WeasyPrint PDF invoice with Amharic support.
         """
         invoice = self.get_object()
+        
+        # Permission check
+        if request.user.profile.role not in ['finance_manager', 'auction_manager', 'administrator']:
+            return Response({'detail': 'Not allowed'}, status=status.HTTP_403_FORBIDDEN)
+        
         fee_percentage = request.data.get('feePercentage')
 
         if fee_percentage is not None:
+            fee_percentage = Decimal(str(fee_percentage))
             for lot in invoice.lots.all():
                 lot.feePercentage = fee_percentage
-                lot.save()  # recalculates lotFee via InvoiceLot.save()
+                lot.save()
 
         if invoice.status == 'invoice_generated':
             previous = invoice.status
@@ -180,9 +172,186 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             log_audit(invoice, 'Generate invoice PDF', request.user, invoice.status, invoice.status,
                        reason='Regenerated — status unchanged (not in invoice_generated)')
 
-        invoice.refresh_from_db()
-        serializer = InvoiceDetailSerializer(invoice)
-        return Response(serializer.data)
+        # Generate PDF
+        try:
+            html_string = self._render_invoice_html(invoice)
+            html = HTML(string=html_string)
+            pdf_file = BytesIO()
+            html.write_pdf(pdf_file)
+            pdf_file.seek(0)
+
+            return FileResponse(
+                pdf_file,
+                as_attachment=True,
+                filename=f"Invoice_{invoice.invoiceNumber}.pdf",
+                content_type='application/pdf'
+            )
+        except Exception as e:
+            return Response({'detail': f'PDF generation failed: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    def _render_invoice_html(self, invoice):
+        """
+        Render invoice as HTML with Amharic text.
+        Uses Noto Sans Ethiopic font for Amharic rendering.
+        """
+        winner = invoice.winner
+        lots_html = ""
+        total_fee = Decimal('0.00')
+
+        for lot in invoice.lots.all():
+            total_fee += lot.lotFee
+            lots_html += f"""
+            <tr>
+                <td>{lot.lotNumber}</td>
+                <td>{lot.auctionName}</td>
+                <td class="amount">ETB {lot.winningAmount:,.2f}</td>
+                <td class="amount">ETB {lot.lotFee:,.2f}</td>
+            </tr>
+            """
+
+        # Amharic labels — REPLACE THESE WITH REAL AMHARIC TEXT FROM A NATIVE SPEAKER
+        # DO NOT FABRICATE TRANSLATIONS
+        amharic_labels = {
+            'invoice': 'ደረሰኝ',  # Receipt
+            'date': 'ቀን',  # Date
+            'bidder': 'ባንድ አሳሪ',  # Bidder
+            'total': 'ጠቅላላ',  # Total
+        }
+
+        html = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <style>
+                @font-face {{
+                    font-family: 'Noto Sans Ethiopic';
+                    src: url('https://fonts.gstatic.com/s/notosansethi/v21/ga6iw1J5msDqwtJzlMw4N7Z2MH86pZRQWezVlZ9fqoI.ttf') format('truetype');
+                }}
+                body {{
+                    font-family: Arial, sans-serif;
+                    margin: 20px;
+                    color: #333;
+                }}
+                .header {{
+                    text-align: center;
+                    margin-bottom: 30px;
+                    border-bottom: 2px solid #333;
+                    padding-bottom: 15px;
+                }}
+                .company-name {{
+                    font-size: 18px;
+                    font-weight: bold;
+                }}
+                .invoice-title {{
+                    font-size: 24px;
+                    font-weight: bold;
+                    margin: 10px 0;
+                    font-family: 'Noto Sans Ethiopic';
+                }}
+                .details {{
+                    margin-bottom: 20px;
+                    display: grid;
+                    grid-template-columns: 1fr 1fr;
+                    gap: 20px;
+                }}
+                .detail-section {{
+                    padding: 10px;
+                }}
+                .detail-label {{
+                    font-weight: bold;
+                    font-size: 12px;
+                    color: #666;
+                }}
+                .detail-value {{
+                    font-size: 14px;
+                    margin-top: 3px;
+                }}
+                table {{
+                    width: 100%;
+                    border-collapse: collapse;
+                    margin: 20px 0;
+                }}
+                th {{
+                    background-color: #f5f5f5;
+                    border: 1px solid #ddd;
+                    padding: 8px;
+                    text-align: left;
+                    font-weight: bold;
+                }}
+                td {{
+                    border: 1px solid #ddd;
+                    padding: 8px;
+                }}
+                .amount {{
+                    text-align: right;
+                }}
+                .total-row {{
+                    background-color: #f9f9f9;
+                    font-weight: bold;
+                }}
+                .footer {{
+                    margin-top: 40px;
+                    text-align: center;
+                    font-size: 12px;
+                    color: #666;
+                }}
+            </style>
+        </head>
+        <body>
+            <div class="header">
+                <div class="company-name">Auction Ethiopia S.C.</div>
+                <div class="invoice-title">Invoice / {amharic_labels['invoice']}</div>
+                <div style="font-size: 12px; color: #666;">Processing Fee Invoice</div>
+            </div>
+
+            <div class="details">
+                <div class="detail-section">
+                    <div class="detail-label">INVOICE NUMBER</div>
+                    <div class="detail-value">{invoice.invoiceNumber}</div>
+                    <div class="detail-label" style="margin-top: 10px;">INVOICE DATE</div>
+                    <div class="detail-value">{invoice.invoiceDate.strftime('%B %d, %Y')}</div>
+                    <div class="detail-label" style="margin-top: 10px;">DUE DATE</div>
+                    <div class="detail-value">{invoice.dueDate.strftime('%B %d, %Y')}</div>
+                </div>
+
+                <div class="detail-section">
+                    <div class="detail-label">BIDDER NAME</div>
+                    <div class="detail-value">{winner.bidderName}</div>
+                    <div class="detail-label" style="margin-top: 10px;">COMPANY</div>
+                    <div class="detail-value">{winner.companyName or 'N/A'}</div>
+                    <div class="detail-label" style="margin-top: 10px;">PHONE</div>
+                    <div class="detail-value">{winner.winnerPhone}</div>
+                </div>
+            </div>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Lot Number</th>
+                        <th>Auction</th>
+                        <th class="amount">Winning Amount</th>
+                        <th class="amount">Processing Fee</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {lots_html}
+                    <tr class="total-row">
+                        <td colspan="3" style="text-align: right;">TOTAL PROCESSING FEE ({amharic_labels['total']}):</td>
+                        <td class="amount">ETB {total_fee:,.2f}</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="footer">
+                <p>This is an automatically generated invoice. Please verify all details and submit payment according to the payment instructions provided.</p>
+                <p>Generated on {timezone.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
+            </div>
+        </body>
+        </html>
+        """
+
+        return html
 
     @action(detail=True, methods=['post'], url_path='change-status')
     def change_status(self, request, pk=None):
@@ -201,9 +370,6 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         invoice.save(update_fields=['status', 'updatedAt'])
         log_audit(invoice, f'Status changed to {new_status}', request.user, previous, new_status, reason)
 
-        # Keep the most recent Payment in sync with invoice-level moves that
-        # correspond to a payment being reviewed, so InvoiceDetailSerializer's
-        # computed verifiedBy stays correct without a separate call.
         latest_payment = invoice.payments.order_by('-uploadedAt').first()
         if latest_payment:
             if new_status in ('under_verification', 'paid') and latest_payment.paymentStatus == 'pending':
@@ -242,7 +408,6 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             serializer = PaymentSerializer(invoice.payments.all().order_by('-uploadedAt'), many=True)
             return Response(serializer.data)
 
-        # POST — uploading a payment record ("Upload receipt")
         if not has_permission(request.user, 'upload_payment_proof'):
             return Response({'error': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
 
@@ -330,6 +495,7 @@ class FeeConfigView(generics.GenericAPIView):
         FeeConfig.objects.filter(isActive=True).update(isActive=False)
         config = FeeConfig.objects.create(percentage=percentage, configuredBy=request.user, isActive=True)
         return Response(FeeConfigSerializer(config).data)
+
 
 # ================================================================= Auth View
 

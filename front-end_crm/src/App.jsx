@@ -81,8 +81,7 @@ export default function App() {
   
 }
 
-  // TODO: if remember=true, store token in localStorage
-}
+  
 
   function handleSaveProfile(newUsername) {
     setSession((s) => ({ ...s, username: newUsername }));
@@ -143,3 +142,4 @@ export default function App() {
       )}
     </div>
   );
+}

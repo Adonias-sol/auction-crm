@@ -16,7 +16,24 @@ import AuditTrail from "./pages/AuditTrail";
 
 export default function App() {
   const [page, setPage] = useState("dashboard");
-  const [session, setSession] = useState(null); // { role, username ,token} | null
+  const [session, setSession] = useState(() => {
+  const stored = localStorage.getItem("authToken");
+  const user = localStorage.getItem("authUser");
+
+  if (stored && user) {
+    try {
+      const parsed = JSON.parse(user);
+      return {
+        ...parsed,
+        token: stored,
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  return null;
+});
   const [theme, setTheme] = useState("light");
   const [showAccountSettings, setShowAccountSettings] = useState(false);
   const [invoices, setInvoices] = useState(invoicesSeed);
@@ -45,9 +62,13 @@ export default function App() {
   }
 
   function handleLogout() {
-    setSession(null);
-    setPage("dashboard");
-    setDetailInvNumber(null);
+  sessionStorage.removeItem("authToken");
+  localStorage.removeItem("authToken");
+  localStorage.removeItem("authUser");
+
+  setSession(null);
+  setPage("dashboard");
+  setDetailInvNumber(null);
   }
 
   function handleLogin(role, username, token, remember) {
@@ -56,6 +77,9 @@ export default function App() {
     username,
     token,
   });
+
+  
+}
 
   // TODO: if remember=true, store token in localStorage
 }
@@ -119,4 +143,3 @@ export default function App() {
       )}
     </div>
   );
-}

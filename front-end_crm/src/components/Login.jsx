@@ -34,7 +34,11 @@ export default function Login({ onLogin }) {
     }
 
     const data = await response.json();
-    sessionStorage.setItem('authToken', data.token); 
+    sessionStorage.setItem('authToken', data.token);
+    if (remember) {
+      localStorage.setItem('authToken', data.token);
+      localStorage.setItem('authUser', JSON.stringify({ username: data.username, role: data.role }));
+      }
     onLogin(data.role, data.username, data.token, remember);
   } catch (err) {
     setError("Network error. Please try again.");

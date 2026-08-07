@@ -135,40 +135,33 @@ export default function Operations({ role, token, onOpenDetail }) {
   }
 
   async function confirmGeneratePdf(percentagesByInvId) {
-    try {
-      for (const [invId, pct] of Object.entries(percentagesByInvId)) {
-        const response = await apiCall(`/api/invoices/${invId}/generate-pdf/`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(token ? { Authorization: `Token ${token}` } : {}),
-          },
-          body: JSON.stringify({ feePercentage: parseFloat(pct) }),
-        });
+  try {
+    for (const [invId, pct] of Object.entries(percentagesByInvId)) {
+      const response = await apiCall(`/api/invoices/${invId}/generate-pdf/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Token ${token}` } : {}),
+        },
+        body: JSON.stringify({ feePercentage: parseFloat(pct) }),
+      });
 
-        if (response.ok) {
-          // Download the PDF
-          const blob = await response.blob();
-          const url = window.URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = `Invoice_${invId}.pdf`;
-          document.body.appendChild(a);
-          a.click();
-          window.URL.revokeObjectURL(url);
-          document.body.removeChild(a);
-        } else {
-          setError(`Failed to generate PDF for invoice ${invId}`);
-        }
+      if (!response.ok) {
+        setError(`Failed to process invoice ${invId}`);
+        return;
       }
-      await fetchInvoices();
-      setSelected([]);
-      setShowGenerateModal(false);
-    } catch (err) {
-      setError('Failed to generate PDFs');
-      console.error(err);
     }
+    
+    // Show success message
+    alert('Invoices processed successfully! PDF generation coming soon.');
+    await fetchInvoices();
+    setSelected([]);
+    setShowGenerateModal(false);
+  } catch (err) {
+    setError('Failed to process invoices');
+    console.error(err);
   }
+}
 
   if (loading) return <div style={{ padding: 20 }}>Loading invoices...</div>;
   if (error) return <div style={{ padding: 20, color: 'red' }}>{error}</div>;

@@ -43,10 +43,10 @@ export default function GeneratePdfModal({ invoices, onConfirm, onClose }) {
                     <td>
                       <input
                         type="number" step="0.01" min="0" max="100"
-                        value={pcts[inv.id]}  // ← CHANGE THIS
-                        onChange={(e) => setPct(inv.id, e.target.value)}  // ← CHANGE THIS
+                        value={pcts[inv.id] || '0.95'}  // ← ADD DEFAULT VALUE
+                        onChange={(e) => setPct(inv.id, e.target.value)}
                         style={{ width: 80, fontFamily: "'IBM Plex Mono',monospace", fontSize: 13, padding: "5px 8px", border: "1px solid var(--border)", borderRadius: 5 }}
-                      /> %
+                      />%
                     </td>
                   </tr>
                 ))}

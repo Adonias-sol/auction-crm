@@ -7,7 +7,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # SECURITY
 SECRET_KEY = config(
     "SECRET_KEY",
-    default="django-insecure-$@vt=8b)un9e=m^zp0l97nnw0v#emzdw#!h3&rtrf!xcxutxu^"
+    default="development-secret-key"
 )
 
 DEBUG = config("DEBUG", default=False, cast=bool)
@@ -47,8 +47,6 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
-    "django.middleware.security.SecurityMiddleware",
-    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",

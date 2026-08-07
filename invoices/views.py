@@ -26,9 +26,8 @@ from .serializers import (
     AuditLogSerializer, FeeConfigSerializer, LoginSerializer,
 )
 from .permissions import ReadOnlyForViewer, ActionPermissionMap, can_transition, has_permission
-import pdfshift
+import requests
 from django.conf import settings
-
 def log_audit(invoice, action_label, user, previous_value='', new_value='', reason=''):
     """
     One place that writes AuditLog rows, so every view stays consistent
@@ -149,53 +148,57 @@ class InvoiceViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'], url_path='generate-pdf')
     def generate_pdf(self, request, pk=None):
-        """
-        POST /api/invoices/{id}/generate-pdf/
-        Body: {feePercentage}
-        Generates PDF via PDFShift API with Amharic support.
-        """
-        invoice = self.get_object()
-        
-        if request.user.profile.role not in ['finance_manager', 'auction_manager', 'administrator']:
-            return Response({'detail': 'Not allowed'}, status=status.HTTP_403_FORBIDDEN)
-        
-        fee_percentage = request.data.get('feePercentage')
+            """
+            POST /api/invoices/{id}/generate-pdf/
+            Body: {feePercentage}
+            Generates PDF via PDFShift API with Amharic support.
+            """
+            invoice = self.get_object()
+            
+            if request.user.profile.role not in ['finance_manager', 'auction_manager', 'administrator']:
+                return Response({'detail': 'Not allowed'}, status=status.HTTP_403_FORBIDDEN)
+            
+            fee_percentage = request.data.get('feePercentage')
 
-        if fee_percentage is not None:
-            fee_percentage = Decimal(str(fee_percentage))
-            for lot in invoice.lots.all():
-                lot.feePercentage = fee_percentage
-                lot.save()
+            if fee_percentage is not None:
+                fee_percentage = Decimal(str(fee_percentage))
+                for lot in invoice.lots.all():
+                    lot.feePercentage = fee_percentage
+                    lot.save()
 
-        if invoice.status == 'invoice_generated':
-            previous = invoice.status
-            invoice.status = 'pending_payment'
-            invoice.save(update_fields=['status', 'updatedAt'])
-            log_audit(invoice, 'Generate invoice PDF', request.user, previous, invoice.status)
+            if invoice.status == 'invoice_generated':
+                previous = invoice.status
+                invoice.status = 'pending_payment'
+                invoice.save(update_fields=['status', 'updatedAt'])
+                log_audit(invoice, 'Generate invoice PDF', request.user, previous, invoice.status)
 
-        # Generate HTML
-        html_string = self._render_invoice_html(invoice)
+            # Generate HTML
+            html_string = self._render_invoice_html(invoice)
 
-        try:
-            # Call PDFShift API
-            client = pdfshift.Client(api_key=settings.PDFSHIFT_API_KEY)
-            pdf_bytes = client.convert_source(
-                source=html_string,
-                options={
-                    'format': 'A4',
-                    'margins': '10mm',
-                }
-            )
+            try:
+                # Call PDFShift API
+                response = requests.post(
+                    'https://api.pdfshift.io/v3/convert/html',
+                    auth=('api', settings.PDFSHIFT_API_KEY),
+                    json={
+                        'source': html_string,
+                        'format': 'A4',
+                        'margins': '10mm',
+                    },
+                    timeout=30
+                )
 
-            return FileResponse(
-                BytesIO(pdf_bytes),
-                as_attachment=True,
-                filename=f"Invoice_{invoice.invoiceNumber}.pdf",
-                content_type='application/pdf'
-            )
-        except Exception as e:
-            return Response({'detail': f'PDF generation failed: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                if response.status_code != 200:
+                    return Response({'detail': f'PDF generation failed: {response.text}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+                return FileResponse(
+                    BytesIO(response.content),
+                    as_attachment=True,
+                    filename=f"Invoice_{invoice.invoiceNumber}.pdf",
+                    content_type='application/pdf'
+                )
+            except Exception as e:
+                return Response({'detail': f'PDF generation failed: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     def _render_invoice_html(self, invoice):
         """
         Render invoice as HTML with Amharic text.

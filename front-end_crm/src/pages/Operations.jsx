@@ -137,7 +137,7 @@ export default function Operations({ role, token, onOpenDetail }) {
   async function confirmGeneratePdf(percentagesByInvId) {
     try {
       for (const [invId, pct] of Object.entries(percentagesByInvId)) {
-        await apiCall(`/api/invoices/${invId}/generate-pdf/`, {
+        const response = await apiCall(`/api/invoices/${invId}/generate-pdf/`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -145,6 +145,21 @@ export default function Operations({ role, token, onOpenDetail }) {
           },
           body: JSON.stringify({ feePercentage: parseFloat(pct) }),
         });
+
+        if (response.ok) {
+          // Download the PDF
+          const blob = await response.blob();
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `Invoice_${invId}.pdf`;
+          document.body.appendChild(a);
+          a.click();
+          window.URL.revokeObjectURL(url);
+          document.body.removeChild(a);
+        } else {
+          setError(`Failed to generate PDF for invoice ${invId}`);
+        }
       }
       await fetchInvoices();
       setSelected([]);

@@ -151,7 +151,7 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         """
         POST /api/invoices/{id}/generate-pdf/
         Body: {feePercentage}
-        Generates a WeasyPrint PDF invoice with Amharic support.
+        For now, just returns invoice data. PDF generation requires system libraries.
         """
         invoice = self.get_object()
         
@@ -172,44 +172,13 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             invoice.save(update_fields=['status', 'updatedAt'])
             log_audit(invoice, 'Generate invoice PDF', request.user, previous, invoice.status)
 
-        # Only generate PDF if WeasyPrint is available
-        if WEASYPRINT_AVAILABLE:
-            try:
-                html_string = self._render_invoice_html(invoice)
-                html = HTML(string=html_string)
-                pdf_file = BytesIO()
-                html.write_pdf(pdf_file)
-                pdf_file.seek(0)
-
-                return FileResponse(
-                    pdf_file,
-                    as_attachment=True,
-                    filename=f"Invoice_{invoice.invoiceNumber}.pdf",
-                    content_type='application/pdf'
-                )
-            except Exception as e:
-                return Response({'detail': f'PDF generation failed: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        else:
-            # For dev/testing, just return the invoice data without PDF
-            invoice.refresh_from_db()
-            serializer = InvoiceDetailSerializer(invoice)
-            return Response({'message': 'PDF generation not available locally. Will work on Render.', 'invoice': serializer.data})
-                # Generate PDF
-        try:
-            html_string = self._render_invoice_html(invoice)
-            html = HTML(string=html_string)
-            pdf_file = BytesIO()
-            html.write_pdf(pdf_file)
-            pdf_file.seek(0)
-
-            return FileResponse(
-                pdf_file,
-                as_attachment=True,
-                filename=f"Invoice_{invoice.invoiceNumber}.pdf",
-                content_type='application/pdf'
-            )
-        except Exception as e:
-            return Response({'detail': f'PDF generation failed: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        # Return invoice data instead of PDF for now
+        invoice.refresh_from_db()
+        serializer = InvoiceDetailSerializer(invoice)
+        return Response({
+            'message': 'Invoice processed successfully. PDF generation coming soon.',
+            'invoice': serializer.data
+        })
 
     def _render_invoice_html(self, invoice):
         """

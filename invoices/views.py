@@ -26,7 +26,8 @@ from .serializers import (
     AuditLogSerializer, FeeConfigSerializer, LoginSerializer,
 )
 from .permissions import ReadOnlyForViewer, ActionPermissionMap, can_transition, has_permission
-
+import pdfshift
+from django.conf import settings
 
 def log_audit(invoice, action_label, user, previous_value='', new_value='', reason=''):
     """
@@ -151,7 +152,7 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         """
         POST /api/invoices/{id}/generate-pdf/
         Body: {feePercentage}
-        For now, just returns invoice data. PDF generation requires system libraries.
+        Generates PDF via PDFShift API with Amharic support.
         """
         invoice = self.get_object()
         
@@ -172,13 +173,182 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             invoice.save(update_fields=['status', 'updatedAt'])
             log_audit(invoice, 'Generate invoice PDF', request.user, previous, invoice.status)
 
-        # Return invoice data instead of PDF for now
-        invoice.refresh_from_db()
-        serializer = InvoiceDetailSerializer(invoice)
-        return Response({
-            'message': 'Invoice processed successfully. PDF generation coming soon.',
-            'invoice': serializer.data
-        })
+        # Generate HTML
+        html_string = self._render_invoice_html(invoice)
+
+        try:
+            # Call PDFShift API
+            client = pdfshift.Client(api_key=settings.PDFSHIFT_API_KEY)
+            pdf_bytes = client.convert_source(
+                source=html_string,
+                options={
+                    'format': 'A4',
+                    'margins': '10mm',
+                }
+            )
+
+            return FileResponse(
+                BytesIO(pdf_bytes),
+                as_attachment=True,
+                filename=f"Invoice_{invoice.invoiceNumber}.pdf",
+                content_type='application/pdf'
+            )
+        except Exception as e:
+            return Response({'detail': f'PDF generation failed: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    def _render_invoice_html(self, invoice):
+        """
+        Render invoice as HTML with Amharic text.
+        """
+        winner = invoice.winner
+        lots_html = ""
+        total_fee = Decimal('0.00')
+
+        for lot in invoice.lots.all():
+            total_fee += lot.lotFee
+            lots_html += f"""
+            <tr>
+                <td>{lot.lotNumber}</td>
+                <td>{lot.auctionName}</td>
+                <td class="amount">ETB {lot.winningAmount:,.2f}</td>
+                <td class="amount">ETB {lot.lotFee:,.2f}</td>
+            </tr>
+            """
+
+        amharic_labels = {
+            'invoice': 'ደረሰኝ',
+            'total': 'ጠቅላላ',
+        }
+
+        html = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <style>
+                body {{
+                    font-family: Arial, sans-serif;
+                    margin: 20px;
+                    color: #333;
+                }}
+                .header {{
+                    text-align: center;
+                    margin-bottom: 30px;
+                    border-bottom: 2px solid #333;
+                    padding-bottom: 15px;
+                }}
+                .company-name {{
+                    font-size: 18px;
+                    font-weight: bold;
+                }}
+                .invoice-title {{
+                    font-size: 24px;
+                    font-weight: bold;
+                    margin: 10px 0;
+                }}
+                .details {{
+                    margin-bottom: 20px;
+                    display: grid;
+                    grid-template-columns: 1fr 1fr;
+                    gap: 20px;
+                }}
+                .detail-section {{
+                    padding: 10px;
+                }}
+                .detail-label {{
+                    font-weight: bold;
+                    font-size: 12px;
+                    color: #666;
+                }}
+                .detail-value {{
+                    font-size: 14px;
+                    margin-top: 3px;
+                }}
+                table {{
+                    width: 100%;
+                    border-collapse: collapse;
+                    margin: 20px 0;
+                }}
+                th {{
+                    background-color: #f5f5f5;
+                    border: 1px solid #ddd;
+                    padding: 8px;
+                    text-align: left;
+                    font-weight: bold;
+                }}
+                td {{
+                    border: 1px solid #ddd;
+                    padding: 8px;
+                }}
+                .amount {{
+                    text-align: right;
+                }}
+                .total-row {{
+                    background-color: #f9f9f9;
+                    font-weight: bold;
+                }}
+                .footer {{
+                    margin-top: 40px;
+                    text-align: center;
+                    font-size: 12px;
+                    color: #666;
+                }}
+            </style>
+        </head>
+        <body>
+            <div class="header">
+                <div class="company-name">Auction Ethiopia S.C.</div>
+                <div class="invoice-title">Invoice / {amharic_labels['invoice']}</div>
+                <div style="font-size: 12px; color: #666;">Processing Fee Invoice</div>
+            </div>
+
+            <div class="details">
+                <div class="detail-section">
+                    <div class="detail-label">INVOICE NUMBER</div>
+                    <div class="detail-value">{invoice.invoiceNumber}</div>
+                    <div class="detail-label" style="margin-top: 10px;">INVOICE DATE</div>
+                    <div class="detail-value">{invoice.invoiceDate.strftime('%B %d, %Y')}</div>
+                    <div class="detail-label" style="margin-top: 10px;">DUE DATE</div>
+                    <div class="detail-value">{invoice.dueDate.strftime('%B %d, %Y')}</div>
+                </div>
+
+                <div class="detail-section">
+                    <div class="detail-label">BIDDER NAME</div>
+                    <div class="detail-value">{winner.bidderName}</div>
+                    <div class="detail-label" style="margin-top: 10px;">COMPANY</div>
+                    <div class="detail-value">{winner.companyName or 'N/A'}</div>
+                    <div class="detail-label" style="margin-top: 10px;">PHONE</div>
+                    <div class="detail-value">{winner.winnerPhone}</div>
+                </div>
+            </div>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Lot Number</th>
+                        <th>Auction</th>
+                        <th class="amount">Winning Amount</th>
+                        <th class="amount">Processing Fee</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {lots_html}
+                    <tr class="total-row">
+                        <td colspan="3" style="text-align: right;">TOTAL PROCESSING FEE ({amharic_labels['total']}):</td>
+                        <td class="amount">ETB {total_fee:,.2f}</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="footer">
+                <p>This is an automatically generated invoice. Please verify all details and submit payment according to the payment instructions provided.</p>
+                <p>Generated on {timezone.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
+            </div>
+        </body>
+        </html>
+        """
+
+        return html
 
     def _render_invoice_html(self, invoice):
         """

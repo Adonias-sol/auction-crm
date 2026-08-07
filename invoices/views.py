@@ -11,7 +11,11 @@ from rest_framework.pagination import PageNumberPagination
 from .pagination import StandardPagination
 from io import BytesIO
 from decimal import Decimal
-from weasyprint import HTML, CSS
+try:
+    from weasyprint import HTML, CSS
+    WEASYPRINT_AVAILABLE = True
+except (ImportError, OSError):
+    WEASYPRINT_AVAILABLE = False
 
 from .models import (
     Auction, Winner, Invoice, InvoiceLot, Payment, Attachment, FeeConfig, AuditLog,
@@ -151,7 +155,6 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         """
         invoice = self.get_object()
         
-        # Permission check
         if request.user.profile.role not in ['finance_manager', 'auction_manager', 'administrator']:
             return Response({'detail': 'Not allowed'}, status=status.HTTP_403_FORBIDDEN)
         
@@ -168,11 +171,30 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             invoice.status = 'pending_payment'
             invoice.save(update_fields=['status', 'updatedAt'])
             log_audit(invoice, 'Generate invoice PDF', request.user, previous, invoice.status)
-        else:
-            log_audit(invoice, 'Generate invoice PDF', request.user, invoice.status, invoice.status,
-                       reason='Regenerated — status unchanged (not in invoice_generated)')
 
-        # Generate PDF
+        # Only generate PDF if WeasyPrint is available
+        if WEASYPRINT_AVAILABLE:
+            try:
+                html_string = self._render_invoice_html(invoice)
+                html = HTML(string=html_string)
+                pdf_file = BytesIO()
+                html.write_pdf(pdf_file)
+                pdf_file.seek(0)
+
+                return FileResponse(
+                    pdf_file,
+                    as_attachment=True,
+                    filename=f"Invoice_{invoice.invoiceNumber}.pdf",
+                    content_type='application/pdf'
+                )
+            except Exception as e:
+                return Response({'detail': f'PDF generation failed: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        else:
+            # For dev/testing, just return the invoice data without PDF
+            invoice.refresh_from_db()
+            serializer = InvoiceDetailSerializer(invoice)
+            return Response({'message': 'PDF generation not available locally. Will work on Render.', 'invoice': serializer.data})
+                # Generate PDF
         try:
             html_string = self._render_invoice_html(invoice)
             html = HTML(string=html_string)

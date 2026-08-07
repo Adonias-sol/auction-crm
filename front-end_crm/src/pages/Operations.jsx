@@ -23,28 +23,36 @@ export default function Operations({ role, token, onOpenDetail }) {
   }, [currentPage, token]);
 
   async function fetchInvoices() {
-    try {
-      setLoading(true);
-      const response = await apiCall(`/api/invoices/?page=${currentPage}`, {
-        method: 'GET',
-        headers: token ? { Authorization: `Token ${token}` } : {},
-      });
+  try {
+    setLoading(true);
+    console.log('Fetching invoices with token:', token);
+    
+    const response = await apiCall(`/api/invoices/?page=${currentPage}`, {
+      method: 'GET',
+      headers: token ? { Authorization: `Token ${token}` } : {},
+    });
 
-      if (!response.ok) {
-        setError('Failed to load invoices');
-        return;
-      }
+    console.log('Response status:', response.status);
+    const data = await response.json();
+    console.log('Response data:', data);
 
-      const data = await response.json();
-      setInvoices(data.results || data);
-      setError("");
-    } catch (err) {
-      setError('Network error loading invoices');
-      console.error(err);
-    } finally {
-      setLoading(false);
+    if (!response.ok) {
+      setError(`Failed to load invoices: ${response.status}`);
+      console.error('API error:', data);
+      return;
     }
+
+    const invoiceList = data.results || data;
+    console.log('Invoices loaded:', invoiceList);
+    setInvoices(invoiceList);
+    setError("");
+  } catch (err) {
+    console.error('Network error:', err);
+    setError('Network error loading invoices');
+  } finally {
+    setLoading(false);
   }
+}
 
   const rows = filtered || invoices;
   const searchDef = searchFieldDefs[searchField];

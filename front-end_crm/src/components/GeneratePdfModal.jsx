@@ -4,17 +4,17 @@
 import { useState } from "react";
 
 export default function GeneratePdfModal({ invoices, onConfirm, onClose }) {
-  const [pcts, setPcts] = useState(() => {
-    const init = {};
-    invoices.forEach((inv) => { init[inv.inv] = "0.95"; });
-    return init;
-  });
+  const [pcts, setPcts] = useState({});
 
-  function setPct(invNumber, val) {
-    setPcts((p) => ({ ...p, [invNumber]: val }));
+  function setPct(invId, value) {
+    setPcts(prev => ({ ...prev, [invId]: value }));
   }
-  function confirm() {
-    onConfirm(pcts);
+  function handleConfirm() {
+    const percentagesByInvId = {};
+    invoices.forEach(inv => {
+      percentagesByInvId[inv.id] = pcts[inv.id] || '0.95';
+    });
+    onConfirm(percentagesByInvId);
     onClose();
   }
 
@@ -37,14 +37,14 @@ export default function GeneratePdfModal({ invoices, onConfirm, onClose }) {
               <thead><tr><th>Invoice #</th><th>Bidder</th><th>Fee %</th></tr></thead>
               <tbody>
                 {invoices.map((inv) => (
-                  <tr key={inv.inv}>
-                    <td className="mono">{inv.inv}</td>
+                  <tr key={inv.id}>  // ← CORRECT
+                    <td className="mono">{inv.invoiceNumber}</td>
                     <td>{inv.bidderName}</td>
                     <td>
                       <input
                         type="number" step="0.01" min="0" max="100"
-                        value={pcts[inv.inv]}
-                        onChange={(e) => setPct(inv.inv, e.target.value)}
+                        value={pcts[inv.id]}  // ← CHANGE THIS
+                        onChange={(e) => setPct(inv.id, e.target.value)}  // ← CHANGE THIS
                         style={{ width: 80, fontFamily: "'IBM Plex Mono',monospace", fontSize: 13, padding: "5px 8px", border: "1px solid var(--border)", borderRadius: 5 }}
                       /> %
                     </td>
@@ -57,7 +57,7 @@ export default function GeneratePdfModal({ invoices, onConfirm, onClose }) {
             This recalculates each invoice's fee amount and total based on the percentage set here. Invoices still in "Invoice Generated" status also move to "Pending Payment"; invoices further along keep their current status.
           </div>
           <div style={{ display: "flex", gap: 8 }}>
-            <button className="btn btn-brass" onClick={confirm}>Generate {invoices.length} PDF{multiple ? "s" : ""}</button>
+            <button className="btn btn-brass" onClick={handleConfirm}>Generate {invoices.length} PDF{multiple ? "s" : ""}</button>
             <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
           </div>
         </div>

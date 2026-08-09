@@ -154,6 +154,7 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         if request.user.profile.role not in ['finance_manager', 'auction_manager', 'administrator']:
             return Response({'detail': 'Not allowed'}, status=status.HTTP_403_FORBIDDEN)
         
+        auction_ref_number = request.data.get('auctionRefNumber', '')
         fee_percentage = request.data.get('feePercentage')
 
         if fee_percentage is not None:
@@ -169,7 +170,7 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             log_audit(invoice, 'Generate invoice PDF', request.user, previous, invoice.status)
 
         # Generate HTML
-        html_string = self._render_invoice_html(invoice)
+        html_string = self._render_invoice_html(invoice, auction_ref_number)
 
         try:
             # Use WeasyPrint to generate PDF
@@ -184,9 +185,9 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         except Exception as e:
             return Response({'detail': f'PDF generation failed: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    def _render_invoice_html(self, invoice):
+    def _render_invoice_html(self, invoice, auction_ref_number=''):
         """
-        Render invoice as HTML with Amharic text.
+        Render invoice as HTML matching Auction Ethiopia official Amharic letter format.
         """
         winner = invoice.winner
         lots_html = ""
@@ -203,11 +204,6 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             </tr>
             """
 
-        amharic_labels = {
-            'invoice': 'ደረሰኝ',
-            'total': 'ጠቅላላ',
-        }
-
         html = f"""
         <!DOCTYPE html>
         <html>
@@ -216,41 +212,44 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             <style>
                 body {{
                     font-family: Arial, sans-serif;
-                    margin: 20px;
+                    margin: 30px;
                     color: #333;
+                    line-height: 1.6;
                 }}
                 .header {{
                     text-align: center;
-                    margin-bottom: 30px;
+                    margin-bottom: 40px;
                     border-bottom: 2px solid #333;
-                    padding-bottom: 15px;
+                    padding-bottom: 20px;
                 }}
-                .company-name {{
+                .logo {{
                     font-size: 18px;
                     font-weight: bold;
+                    margin-bottom: 5px;
                 }}
-                .invoice-title {{
-                    font-size: 24px;
-                    font-weight: bold;
-                    margin: 10px 0;
-                }}
-                .details {{
+                .auction-ref {{
+                    text-align: right;
                     margin-bottom: 20px;
-                    display: grid;
-                    grid-template-columns: 1fr 1fr;
-                    gap: 20px;
-                }}
-                .detail-section {{
-                    padding: 10px;
-                }}
-                .detail-label {{
                     font-weight: bold;
-                    font-size: 12px;
-                    color: #666;
                 }}
-                .detail-value {{
-                    font-size: 14px;
-                    margin-top: 3px;
+                .letter-header {{
+                    margin-bottom: 30px;
+                }}
+                .letter-header p {{
+                    margin: 5px 0;
+                }}
+                .recipient {{
+                    margin-bottom: 30px;
+                }}
+                .recipient-label {{
+                    font-weight: bold;
+                }}
+                .recipient-value {{
+                    margin-left: 20px;
+                }}
+                .intro-text {{
+                    margin-bottom: 20px;
+                    font-style: italic;
                 }}
                 table {{
                     width: 100%;
@@ -260,13 +259,13 @@ class InvoiceViewSet(viewsets.ModelViewSet):
                 th {{
                     background-color: #f5f5f5;
                     border: 1px solid #ddd;
-                    padding: 8px;
+                    padding: 10px;
                     text-align: left;
                     font-weight: bold;
                 }}
                 td {{
                     border: 1px solid #ddd;
-                    padding: 8px;
+                    padding: 10px;
                 }}
                 .amount {{
                     text-align: right;
@@ -277,37 +276,44 @@ class InvoiceViewSet(viewsets.ModelViewSet):
                 }}
                 .footer {{
                     margin-top: 40px;
-                    text-align: center;
                     font-size: 12px;
-                    color: #666;
+                }}
+                .signature-section {{
+                    margin-top: 40px;
+                    text-align: right;
+                }}
+                .job-title {{
+                    font-weight: bold;
+                    margin-top: 10px;
                 }}
             </style>
         </head>
         <body>
-            <div class="header">
-                <div class="company-name">Auction Ethiopia S.C.</div>
-                <div class="invoice-title">Invoice / {amharic_labels['invoice']}</div>
-                <div style="font-size: 12px; color: #666;">Processing Fee Invoice</div>
+            <div class="auction-ref">
+                ጨረታ ቁጥር: {auction_ref_number}
             </div>
 
-            <div class="details">
-                <div class="detail-section">
-                    <div class="detail-label">INVOICE NUMBER</div>
-                    <div class="detail-value">{invoice.invoiceNumber}</div>
-                    <div class="detail-label" style="margin-top: 10px;">INVOICE DATE</div>
-                    <div class="detail-value">{invoice.invoiceDate.strftime('%B %d, %Y')}</div>
-                    <div class="detail-label" style="margin-top: 10px;">DUE DATE</div>
-                    <div class="detail-value">{invoice.dueDate.strftime('%B %d, %Y')}</div>
-                </div>
+            <div class="header">
+                <div class="logo">Auction Ethiopia S.C.</div>
+                <div style="font-size: 12px; color: #666;">PROCESSING FEE MANAGEMENT</div>
+            </div>
 
-                <div class="detail-section">
-                    <div class="detail-label">BIDDER NAME</div>
-                    <div class="detail-value">{winner.bidderName}</div>
-                    <div class="detail-label" style="margin-top: 10px;">COMPANY</div>
-                    <div class="detail-value">{winner.companyName or 'N/A'}</div>
-                    <div class="detail-label" style="margin-top: 10px;">PHONE</div>
-                    <div class="detail-value">{winner.winnerPhone}</div>
-                </div>
+            <div class="letter-header">
+                <p>ለደንበኞች ሂደ.</p>
+                <p>ጠብ ጥሪት</p>
+            </div>
+
+            <div class="intro-text">
+                ጭቃቂ- ደረሰኝ processing fee ኪሳራ ለጠ ተወደደዉ
+            </div>
+
+            <div class="recipient">
+                <div class="recipient-label">ለ:</div>
+                <div class="recipient-value">{winner.bidderName}</div>
+            </div>
+
+            <div class="intro-text">
+                Processing fee invoice for auction lots won
             </div>
 
             <table>
@@ -322,15 +328,22 @@ class InvoiceViewSet(viewsets.ModelViewSet):
                 <tbody>
                     {lots_html}
                     <tr class="total-row">
-                        <td colspan="3" style="text-align: right;">TOTAL PROCESSING FEE ({amharic_labels['total']}):</td>
+                        <td colspan="3" style="text-align: right;">ጠቅላላ ዋጋ ቫትን ጨምሮ ብር:</td>
                         <td class="amount">ETB {total_fee:,.2f}</td>
                     </tr>
                 </tbody>
             </table>
 
             <div class="footer">
-                <p>This is an automatically generated invoice. Please verify all details and submit payment according to the payment instructions provided.</p>
-                <p>Generated on {timezone.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
+                <p>Payment must be submitted within 3 working days of invoice date.</p>
+                <p>Invoice Date: {invoice.invoiceDate.strftime('%B %d, %Y')}</p>
+                <p>Due Date: {invoice.dueDate.strftime('%B %d, %Y')}</p>
+            </div>
+
+            <div class="signature-section">
+                <p style="margin-top: 50px;">_____________________</p>
+                <div class="job-title">የደንበኞች አስተዳደር</div>
+                <div style="font-size: 12px; color: #666;">(Customer Service)</div>
             </div>
         </body>
         </html>

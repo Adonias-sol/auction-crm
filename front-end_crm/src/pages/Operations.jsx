@@ -134,7 +134,8 @@ export default function Operations({ role, token, onOpenDetail }) {
     setShowGenerateModal(true);
   }
 
-  async function confirmGeneratePdf(percentagesByInvId) {
+  async function confirmGeneratePdf(data) {
+    const { percentagesByInvId, auctionRefNumber } = data;
     try {
       for (const [invId, pct] of Object.entries(percentagesByInvId)) {
        
@@ -144,7 +145,10 @@ export default function Operations({ role, token, onOpenDetail }) {
             'Content-Type': 'application/json',
             'Authorization': `Token ${token}`,
           },
-          body: JSON.stringify({ feePercentage: parseFloat(pct) }),
+          body: JSON.stringify({ 
+              feePercentage: parseFloat(pct),
+              auctionRefNumber: auctionRefNumber || ''
+            }),
         });
 
         if (!response.ok) {

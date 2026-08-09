@@ -7,7 +7,7 @@ services:
     name: auction-crm-api
     runtime: python
     plan: free
-    buildCommand: "pip install -r requirements.txt && python manage.py collectstatic --noinput && python manage.py migrate && python manage.py bootstrap_admin"
+    buildCommand: "apt-get update && apt-get install -y libpango-1.0-0 libpango-1.0-dev libpangoft2-1.0-0 libcairo2 libcairo2-dev libgobject-2.0-0 libgobject-2.0-dev && pip install -r requirements.txt && python manage.py collectstatic --noinput && python manage.py migrate && python manage.py bootstrap_admin"
     startCommand: "gunicorn auction_crm.wsgi:application"
     envVars:
       - key: DATABASE_URL
@@ -22,6 +22,8 @@ services:
         value: "auction-crm-api.onrender.com"
       - key: CORS_ALLOWED_ORIGINS
         value: "https://auction-crm-frontend.onrender.com"
+      - key: CSRF_TRUSTED_ORIGINS
+        value: "https://auction-crm-frontend.onrender.com"
       - key: PYTHON_VERSION
         value: "3.12.0"
       - key: BOOTSTRAP_ADMIN_USERNAME
@@ -31,28 +33,16 @@ services:
       - key: BOOTSTRAP_ADMIN_EMAIL
         sync: false
 
-  # New: the frontend, as a static site build out of front-end_crm/.
-  # rootDir matches your actual folder name (front-end_crm, not
-  # "frontend" — that was the original plan's guess, your repo uses
-  # something different).
   - type: web
     name: auction-crm-frontend
     runtime: static
     rootDir: front-end_crm
-    buildCommand: "apt-get update && apt-get install -y libpango-1.0-0 libpango-1.0-dev libpangoft2-1.0-0 libcairo2 libcairo2-dev libgobject-2.0-0 libgobject-2.0-dev && pip install -r requirements.txt && python manage.py collectstatic --noinput && python manage.py migrate && python manage.py bootstrap_admin"
+    buildCommand: "npm install && npm run build"
     staticPublishPath: dist
     envVars:
-      # Baked into the build at build time (Vite env vars are compiled
-      # in, not read at runtime) — this is what api.js's
-      # import.meta.env.VITE_API_BASE picks up once deployed, so the
-      # frontend calls your real backend instead of a relative /api path.
       - key: VITE_API_BASE
         value: "https://auction-crm-api.onrender.com"
     routes:
-      # Not strictly needed by this app right now — it does all page
-      # switching with React state, not real URL routes, so there's
-      # only ever one real path. Harmless standard boilerplate to have
-      # in place in case that changes later.
       - type: rewrite
         source: /*
         destination: /index.html

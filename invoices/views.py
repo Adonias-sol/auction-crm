@@ -173,12 +173,11 @@ class InvoiceViewSet(viewsets.ModelViewSet):
 
         try:
             # Use WeasyPrint to generate PDF
-            pdf_file = BytesIO()
-            HTML(string=html_string).write_pdf(pdf_file)
-            pdf_file.seek(0)
-
+            from weasyprint import HTML, CSS
+            pdf_bytes = HTML(string=html_string).write_pdf()
+            
             return FileResponse(
-                pdf_file,
+                BytesIO(pdf_bytes),
                 as_attachment=True,
                 filename=f"Invoice_{invoice.invoiceNumber}.pdf",
                 content_type='application/pdf'

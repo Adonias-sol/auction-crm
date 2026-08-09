@@ -39,7 +39,7 @@ services:
     name: auction-crm-frontend
     runtime: static
     rootDir: front-end_crm
-    buildCommand: "npm install && npm run build"
+    buildCommand: "apt-get update && apt-get install -y libpango-1.0-0 libpango-1.0-dev libpangoft2-1.0-0 libcairo2 libcairo2-dev libgobject-2.0-0 libgobject-2.0-dev && pip install -r requirements.txt && python manage.py collectstatic --noinput && python manage.py migrate && python manage.py bootstrap_admin"
     staticPublishPath: dist
     envVars:
       # Baked into the build at build time (Vite env vars are compiled

@@ -5,10 +5,8 @@ databases:
 services:
   - type: web
     name: auction-crm-api
-    runtime: python
+    runtime: docker
     plan: free
-    buildCommand: "apt-get update && apt-get install -y libpango-1.0-0 libpango-1.0-dev libpangoft2-1.0-0 libcairo2 libcairo2-dev libgobject-2.0-0 libgobject-2.0-dev && pip install -r requirements.txt && python manage.py collectstatic --noinput && python manage.py migrate && python manage.py bootstrap_admin"
-    startCommand: "gunicorn auction_crm.wsgi:application"
     envVars:
       - key: DATABASE_URL
         fromDatabase:

@@ -21,7 +21,7 @@ export default function Operations({ role, token, onOpenDetail }) {
   useEffect(() => {
     fetchInvoices();
   }, [currentPage, token]);
-
+ 
   async function fetchInvoices() {
   try {
     setLoading(true);
@@ -137,7 +137,7 @@ export default function Operations({ role, token, onOpenDetail }) {
   async function confirmGeneratePdf(percentagesByInvId) {
     try {
       for (const [invId, pct] of Object.entries(percentagesByInvId)) {
-        const token = sessionStorage.getItem('authToken');
+       
         const response = await fetch(`https://auction-crm-api.onrender.com/api/invoices/${invId}/generate-pdf/`, {
           method: 'POST',
           headers: {

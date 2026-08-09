@@ -2,13 +2,18 @@
 // it's used by BOTH Operations.jsx (bulk generate) and InvoiceDetailModal.jsx
 // (single-invoice generate), so it has to be its own file either way.
 import { useState } from "react";
-const [auctionRefNumber, setAuctionRefNumber] = useState('');
 
 export default function GeneratePdfModal({ invoices, onConfirm, onClose }) {
-  const [pcts, setPcts] = useState({});
+  const [pcts, setPcts] = useState(() => {
+    const init = {};
+    invoices.forEach((inv) => { init[inv.id] = "0.95"; });
+    return init;
+  });
 
+  const [auctionRefNumber, setAuctionRefNumber] = useState('');
   function setPct(invId, value) {
     setPcts(prev => ({ ...prev, [invId]: value }));
+
   }
   function handleConfirm() {
     const percentagesByInvId = {};

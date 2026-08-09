@@ -173,7 +173,6 @@ class InvoiceViewSet(viewsets.ModelViewSet):
 
         try:
             # Use WeasyPrint to generate PDF
-            from weasyprint import HTML, CSS
             pdf_bytes = HTML(string=html_string).write_pdf()
             
             return FileResponse(

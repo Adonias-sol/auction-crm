@@ -1,14 +1,12 @@
 FROM python:3.12-slim
 
-# Install system dependencies for WeasyPrint
 RUN apt-get update && apt-get install -y \
     libpango-1.0-0 \
-    libpango-1.0-dev \
     libpangoft2-1.0-0 \
-    libcairo2 \
-    libcairo2-dev \
-    libgobject-2.0-0 \
-    libgobject-2.0-dev \
+    libharfbuzz-subset0 \
+    libjpeg62-turbo \
+    libopenjp2-7 \
+    fontconfig \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

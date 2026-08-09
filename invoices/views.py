@@ -11,11 +11,7 @@ from rest_framework.pagination import PageNumberPagination
 from .pagination import StandardPagination
 from io import BytesIO
 from decimal import Decimal
-try:
-    from weasyprint import HTML, CSS
-    WEASYPRINT_AVAILABLE = True
-except (ImportError, OSError):
-    WEASYPRINT_AVAILABLE = False
+from weasyprint import HTML
 
 from .models import (
     Auction, Winner, Invoice, InvoiceLot, Payment, Attachment, FeeConfig, AuditLog,
@@ -26,8 +22,8 @@ from .serializers import (
     AuditLogSerializer, FeeConfigSerializer, LoginSerializer,
 )
 from .permissions import ReadOnlyForViewer, ActionPermissionMap, can_transition, has_permission
-import requests
-from django.conf import settings
+
+
 def log_audit(invoice, action_label, user, previous_value='', new_value='', reason=''):
     """
     One place that writes AuditLog rows, so every view stays consistent
@@ -148,57 +144,48 @@ class InvoiceViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'], url_path='generate-pdf')
     def generate_pdf(self, request, pk=None):
-            """
-            POST /api/invoices/{id}/generate-pdf/
-            Body: {feePercentage}
-            Generates PDF via PDFShift API with Amharic support.
-            """
-            invoice = self.get_object()
-            
-            if request.user.profile.role not in ['finance_manager', 'auction_manager', 'administrator']:
-                return Response({'detail': 'Not allowed'}, status=status.HTTP_403_FORBIDDEN)
-            
-            fee_percentage = request.data.get('feePercentage')
+        """
+        POST /api/invoices/{id}/generate-pdf/
+        Body: {feePercentage}
+        Generates PDF via WeasyPrint with Amharic support.
+        """
+        invoice = self.get_object()
+        
+        if request.user.profile.role not in ['finance_manager', 'auction_manager', 'administrator']:
+            return Response({'detail': 'Not allowed'}, status=status.HTTP_403_FORBIDDEN)
+        
+        fee_percentage = request.data.get('feePercentage')
 
-            if fee_percentage is not None:
-                fee_percentage = Decimal(str(fee_percentage))
-                for lot in invoice.lots.all():
-                    lot.feePercentage = fee_percentage
-                    lot.save()
+        if fee_percentage is not None:
+            fee_percentage = Decimal(str(fee_percentage))
+            for lot in invoice.lots.all():
+                lot.feePercentage = fee_percentage
+                lot.save()
 
-            if invoice.status == 'invoice_generated':
-                previous = invoice.status
-                invoice.status = 'pending_payment'
-                invoice.save(update_fields=['status', 'updatedAt'])
-                log_audit(invoice, 'Generate invoice PDF', request.user, previous, invoice.status)
+        if invoice.status == 'invoice_generated':
+            previous = invoice.status
+            invoice.status = 'pending_payment'
+            invoice.save(update_fields=['status', 'updatedAt'])
+            log_audit(invoice, 'Generate invoice PDF', request.user, previous, invoice.status)
 
-            # Generate HTML
-            html_string = self._render_invoice_html(invoice)
+        # Generate HTML
+        html_string = self._render_invoice_html(invoice)
 
-            try:
-                # Call PDFShift API
-                response = requests.post(
-                    'https://api.pdfshift.io/v3/convert/html',
-                    auth=('api', settings.PDFSHIFT_API_KEY),
-                    json={
-                        'source': html_string,
-                        'format': 'A4',
-                        'margins': '10mm',
-                    },
-                    timeout=30
-                )
+        try:
+            # Use WeasyPrint to generate PDF
+            pdf_file = BytesIO()
+            HTML(string=html_string).write_pdf(pdf_file)
+            pdf_file.seek(0)
 
-                if response.status_code != 200:
-                    return Response({'detail': f'PDF generation failed: {response.text}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return FileResponse(
+                pdf_file,
+                as_attachment=True,
+                filename=f"Invoice_{invoice.invoiceNumber}.pdf",
+                content_type='application/pdf'
+            )
+        except Exception as e:
+            return Response({'detail': f'PDF generation failed: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-                return FileResponse(
-                    BytesIO(response.content),
-                    as_attachment=True,
-                    filename=f"Invoice_{invoice.invoiceNumber}.pdf",
-                    content_type='application/pdf'
-                )
-            except Exception as e:
-                return Response({'detail': f'PDF generation failed: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     def _render_invoice_html(self, invoice):
         """
         Render invoice as HTML with Amharic text.
@@ -248,170 +235,6 @@ class InvoiceViewSet(viewsets.ModelViewSet):
                     font-size: 24px;
                     font-weight: bold;
                     margin: 10px 0;
-                }}
-                .details {{
-                    margin-bottom: 20px;
-                    display: grid;
-                    grid-template-columns: 1fr 1fr;
-                    gap: 20px;
-                }}
-                .detail-section {{
-                    padding: 10px;
-                }}
-                .detail-label {{
-                    font-weight: bold;
-                    font-size: 12px;
-                    color: #666;
-                }}
-                .detail-value {{
-                    font-size: 14px;
-                    margin-top: 3px;
-                }}
-                table {{
-                    width: 100%;
-                    border-collapse: collapse;
-                    margin: 20px 0;
-                }}
-                th {{
-                    background-color: #f5f5f5;
-                    border: 1px solid #ddd;
-                    padding: 8px;
-                    text-align: left;
-                    font-weight: bold;
-                }}
-                td {{
-                    border: 1px solid #ddd;
-                    padding: 8px;
-                }}
-                .amount {{
-                    text-align: right;
-                }}
-                .total-row {{
-                    background-color: #f9f9f9;
-                    font-weight: bold;
-                }}
-                .footer {{
-                    margin-top: 40px;
-                    text-align: center;
-                    font-size: 12px;
-                    color: #666;
-                }}
-            </style>
-        </head>
-        <body>
-            <div class="header">
-                <div class="company-name">Auction Ethiopia S.C.</div>
-                <div class="invoice-title">Invoice / {amharic_labels['invoice']}</div>
-                <div style="font-size: 12px; color: #666;">Processing Fee Invoice</div>
-            </div>
-
-            <div class="details">
-                <div class="detail-section">
-                    <div class="detail-label">INVOICE NUMBER</div>
-                    <div class="detail-value">{invoice.invoiceNumber}</div>
-                    <div class="detail-label" style="margin-top: 10px;">INVOICE DATE</div>
-                    <div class="detail-value">{invoice.invoiceDate.strftime('%B %d, %Y')}</div>
-                    <div class="detail-label" style="margin-top: 10px;">DUE DATE</div>
-                    <div class="detail-value">{invoice.dueDate.strftime('%B %d, %Y')}</div>
-                </div>
-
-                <div class="detail-section">
-                    <div class="detail-label">BIDDER NAME</div>
-                    <div class="detail-value">{winner.bidderName}</div>
-                    <div class="detail-label" style="margin-top: 10px;">COMPANY</div>
-                    <div class="detail-value">{winner.companyName or 'N/A'}</div>
-                    <div class="detail-label" style="margin-top: 10px;">PHONE</div>
-                    <div class="detail-value">{winner.winnerPhone}</div>
-                </div>
-            </div>
-
-            <table>
-                <thead>
-                    <tr>
-                        <th>Lot Number</th>
-                        <th>Auction</th>
-                        <th class="amount">Winning Amount</th>
-                        <th class="amount">Processing Fee</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {lots_html}
-                    <tr class="total-row">
-                        <td colspan="3" style="text-align: right;">TOTAL PROCESSING FEE ({amharic_labels['total']}):</td>
-                        <td class="amount">ETB {total_fee:,.2f}</td>
-                    </tr>
-                </tbody>
-            </table>
-
-            <div class="footer">
-                <p>This is an automatically generated invoice. Please verify all details and submit payment according to the payment instructions provided.</p>
-                <p>Generated on {timezone.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
-            </div>
-        </body>
-        </html>
-        """
-
-        return html
-
-    def _render_invoice_html(self, invoice):
-        """
-        Render invoice as HTML with Amharic text.
-        Uses Noto Sans Ethiopic font for Amharic rendering.
-        """
-        winner = invoice.winner
-        lots_html = ""
-        total_fee = Decimal('0.00')
-
-        for lot in invoice.lots.all():
-            total_fee += lot.lotFee
-            lots_html += f"""
-            <tr>
-                <td>{lot.lotNumber}</td>
-                <td>{lot.auctionName}</td>
-                <td class="amount">ETB {lot.winningAmount:,.2f}</td>
-                <td class="amount">ETB {lot.lotFee:,.2f}</td>
-            </tr>
-            """
-
-        # Amharic labels — REPLACE THESE WITH REAL AMHARIC TEXT FROM A NATIVE SPEAKER
-        # DO NOT FABRICATE TRANSLATIONS
-        amharic_labels = {
-            'invoice': 'ደረሰኝ',  # Receipt
-            'date': 'ቀን',  # Date
-            'bidder': 'ባንድ አሳሪ',  # Bidder
-            'total': 'ጠቅላላ',  # Total
-        }
-
-        html = f"""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta charset="UTF-8">
-            <style>
-                @font-face {{
-                    font-family: 'Noto Sans Ethiopic';
-                    src: url('https://fonts.gstatic.com/s/notosansethi/v21/ga6iw1J5msDqwtJzlMw4N7Z2MH86pZRQWezVlZ9fqoI.ttf') format('truetype');
-                }}
-                body {{
-                    font-family: Arial, sans-serif;
-                    margin: 20px;
-                    color: #333;
-                }}
-                .header {{
-                    text-align: center;
-                    margin-bottom: 30px;
-                    border-bottom: 2px solid #333;
-                    padding-bottom: 15px;
-                }}
-                .company-name {{
-                    font-size: 18px;
-                    font-weight: bold;
-                }}
-                .invoice-title {{
-                    font-size: 24px;
-                    font-weight: bold;
-                    margin: 10px 0;
-                    font-family: 'Noto Sans Ethiopic';
                 }}
                 .details {{
                     margin-bottom: 20px;

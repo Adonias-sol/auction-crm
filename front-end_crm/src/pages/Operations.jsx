@@ -134,21 +134,20 @@ export default function Operations({ role, token, onOpenDetail }) {
     setShowGenerateModal(true);
   }
 
-  async function confirmGeneratePdf(data) {
-    const { percentagesByInvId, auctionRefNumber } = data;
+  async function confirmGeneratePdf({ percentagesByInvId, auctionRefNumber }) {
     try {
       for (const [invId, pct] of Object.entries(percentagesByInvId)) {
-       
+
         const response = await fetch(`https://auction-crm-api.onrender.com/api/invoices/${invId}/generate-pdf/`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Token ${token}`,
           },
-          body: JSON.stringify({ 
-              feePercentage: parseFloat(pct),
-              auctionRefNumber: auctionRefNumber || ''
-            }),
+          body: JSON.stringify({
+            feePercentage: parseFloat(pct),
+            auctionRefNumber: auctionRefNumber || '',
+          }),
         });
 
         if (!response.ok) {
@@ -157,7 +156,6 @@ export default function Operations({ role, token, onOpenDetail }) {
           return;
         }
 
-        // Download PDF
         const blob = await response.blob();
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -168,7 +166,7 @@ export default function Operations({ role, token, onOpenDetail }) {
         window.URL.revokeObjectURL(url);
         document.body.removeChild(a);
       }
-      
+
       alert('PDFs generated successfully!');
       await fetchInvoices();
       setSelected([]);
@@ -177,7 +175,7 @@ export default function Operations({ role, token, onOpenDetail }) {
       setError('Failed to generate PDFs');
       console.error(err);
     }
-    }
+  }
 
   if (loading) return <div style={{ padding: 20 }}>Loading invoices...</div>;
   if (error) return <div style={{ padding: 20, color: 'red' }}>{error}</div>;

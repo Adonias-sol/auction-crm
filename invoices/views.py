@@ -27,11 +27,23 @@ from .serializers import (
 from .permissions import ReadOnlyForViewer, ActionPermissionMap, can_transition, has_permission
 
 
+
 def log_audit(invoice, action_label, user, previous_value='', new_value='', reason=''):
     """
     One place that writes AuditLog rows, so every view stays consistent
     with what admin.py already enforces (read-only, code-created only).
     """
+    def _join_amharic_list(items):
+        """'A' / 'A እና B' / 'A, B እና C' — Amharic-style list joining."""
+        items = [str(i) for i in items]
+        if not items:
+            return ""
+        if len(items) == 1:
+            return items[0]
+        if len(items) == 2:
+            return f"{items[0]} እና {items[1]}"
+        return ", ".join(items[:-1]) + f" እና {items[-1]}"
+
     AuditLog.objects.create(
         invoice=invoice,
         action=action_label,
@@ -149,12 +161,13 @@ class InvoiceViewSet(viewsets.ModelViewSet):
     def generate_pdf(self, request, pk=None):
         """
         POST /api/invoices/{id}/generate-pdf/
+        Body: {feePercentage, auctionRefNumber}
         """
         invoice = self.get_object()
-        
+
         if request.user.profile.role not in ['finance_manager', 'auction_manager', 'administrator']:
             return Response({'detail': 'Not allowed'}, status=status.HTTP_403_FORBIDDEN)
-        
+
         fee_percentage = request.data.get('feePercentage')
         auction_ref_number = request.data.get('auctionRefNumber', '')
 
@@ -170,36 +183,17 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             invoice.save(update_fields=['status', 'updatedAt'])
             log_audit(invoice, 'Generate invoice PDF', request.user, previous, invoice.status)
 
-        # Read images as base64
-        import base64
-        import os
-        from django.conf import settings
-        
-        logo_base64 = ''
-        stamp_base64 = ''
-        signature_base64 = ''
-        watermark_base64 = ''
-        
+        images = {}
         static_dir = os.path.join(settings.BASE_DIR, 'invoices', 'static')
-        
-        for filename, var_name in [('logo.png', 'logo_base64'), ('stamp.png', 'stamp_base64'), ('signature.png', 'signature_base64'), ('watermark.png', 'watermark_base64')]:
+        for filename, key in [('logo.png', 'logo'), ('stamp.png', 'stamp'),
+                               ('signature.png', 'signature'), ('footer.png', 'footer'),('watermark.png', 'watermark')]:
             filepath = os.path.join(static_dir, filename)
+            images[key] = ''
             if os.path.exists(filepath):
-                try:
-                    with open(filepath, 'rb') as f:
-                        encoded = base64.b64encode(f.read()).decode('utf-8')
-                        if var_name == 'logo_base64':
-                            logo_base64 = encoded
-                        elif var_name == 'stamp_base64':
-                            stamp_base64 = encoded
-                        elif var_name == 'signature_base64':
-                            signature_base64 = encoded
-                        elif var_name == 'watermark_base64':
-                            watermark_base64 = encoded
-                except Exception as e:
-                    pass
+                with open(filepath, 'rb') as f:
+                    images[key] = base64.b64encode(f.read()).decode('utf-8')
 
-        html_string = self._render_invoice_html(invoice, auction_ref_number, logo_base64, stamp_base64, signature_base64, watermark_base64)
+        html_string = self._render_invoice_html(invoice, auction_ref_number, images)
 
         try:
             pdf_bytes = HTML(string=html_string).write_pdf()
@@ -212,231 +206,111 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         except Exception as e:
             return Response({'detail': f'PDF generation failed: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    def _render_invoice_html(self, invoice, auction_ref_number='', logo_base64='', stamp_base64='', signature_base64='', watermark_base64=''):
-            """
-            Render invoice as HTML matching Auction Ethiopia official Amharic letter format.
-            """
-            winner = invoice.winner
-            lots_html = ""
-            total_fee = Decimal('0.00')
+    def _render_invoice_html(self, invoice, auction_ref_number, images):
+        """
+        Matches the official Auction Ethiopia letter format exactly —
+        only the bracketed values below differ per invoice.
+        """
+        winner = invoice.winner
+        lots = list(invoice.lots.all())
 
-            for lot in invoice.lots.all():
-                total_fee += lot.lotFee
-                lots_html += f"""
-                <tr>
-                    <td style="padding: 8px; border: 1px solid #ddd;">{lot.lotNumber}</td>
-                    <td style="padding: 8px; border: 1px solid #ddd;">{lot.auctionName}</td>
-                    <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">ETB {lot.winningAmount:,.2f}</td>
-                    <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">ETB {lot.lotFee:,.2f}</td>
-                </tr>
-                """
+        total_amount = sum((lot.winningAmount for lot in lots), Decimal('0.00'))
+        total_fee = sum((lot.lotFee for lot in lots), Decimal('0.00'))
+        fee_percentage = lots[0].feePercentage.normalize() if lots else Decimal('0')
+        auction_name = lots[0].auctionName if lots else ''
+        lot_numbers = _join_amharic_list([lot.lotNumber for lot in lots])
 
-            # Build image HTML outside main template
-            watermark_html = f'<img src="data:image/png;base64,{watermark_base64}" class="watermark" />' if watermark_base64 else ''
-            logo_html = f'<img src="data:image/png;base64,{logo_base64}" style="max-width: 120px; margin-bottom: 10px;" />' if logo_base64 else ''
-            stamp_html = f'<img src="data:image/png;base64,{stamp_base64}" style="max-width: 150px;" />' if stamp_base64 else '<div style="font-size: 24px; color: #999;">[OFFICIAL STAMP]</div>'
-            signature_html = f'<img src="data:image/png;base64,{signature_base64}" style="max-width: 150px; margin-bottom: 10px;" />' if signature_base64 else '<div style="font-size: 24px; color: #999;">[SIGNATURE]</div>'
-
-            html = f"""
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <meta charset="UTF-8">
-                <style>
-                    body {{
-                        font-family: Arial, sans-serif;
-                        margin: 40px;
-                        color: #333;
-                        line-height: 1.5;
-                    }}
-                    .watermark {{
-                        position: fixed;
-                        left: 50%;
-                        top: 50%;
-                        transform: translate(-50%, -50%);
-                        opacity: 0.1;
-                        z-index: -1;
-                        width: 400px;
-                        height: 400px;
-                    }}
-                    .header {{
-                        display: flex;
-                        justify-content: space-between;
-                        align-items: flex-start;
-                        margin-bottom: 40px;
-                        border-bottom: 2px solid #333;
-                        padding-bottom: 20px;
-                    }}
-                    .company-info {{
-                        text-align: center;
-                        flex: 1;
-                    }}
-                    .company-name {{
-                        font-size: 20px;
-                        font-weight: bold;
-                    }}
-                    .company-subtitle {{
-                        font-size: 12px;
-                        color: #666;
-                    }}
-                    .audit-ref {{
-                        text-align: right;
-                    }}
-                    .audit-ref-label {{
-                        font-size: 11px;
-                        color: #666;
-                    }}
-                    .audit-ref-value {{
-                        font-size: 12px;
-                        font-weight: bold;
-                    }}
-                    .letter-opener {{
-                        margin: 30px 0;
-                    }}
-                    .letter-opener p {{
-                        margin: 8px 0;
-                        font-size: 13px;
-                    }}
-                    .recipient {{
-                        margin: 20px 0;
-                        font-size: 13px;
-                    }}
-                    .recipient-label {{
-                        font-weight: bold;
-                        display: inline-block;
-                        width: 30px;
-                    }}
-                    .recipient-name {{
-                        display: inline-block;
-                    }}
-                    .intro-text {{
-                        margin: 20px 0;
-                        font-size: 13px;
-                        line-height: 1.6;
-                    }}
-                    table {{
-                        width: 100%;
-                        border-collapse: collapse;
-                        margin: 30px 0;
-                        font-size: 12px;
-                    }}
-                    th {{
-                        background-color: #f5f5f5;
-                        border: 1px solid #ddd;
-                        padding: 10px;
-                        text-align: left;
-                        font-weight: bold;
-                    }}
-                    td {{
-                        padding: 8px;
-                        border: 1px solid #ddd;
-                    }}
-                    .total-row {{
-                        background-color: #f9f9f9;
-                        font-weight: bold;
-                    }}
-                    .total-row td {{
-                        padding: 12px 8px;
-                    }}
-                    .footer-text {{
-                        margin-top: 30px;
-                        font-size: 12px;
-                        line-height: 1.6;
-                    }}
-                    .signature-section {{
-                        margin-top: 50px;
-                        text-align: right;
-                        font-size: 12px;
-                    }}
-                    .signature-line {{
-                        margin-top: 40px;
-                        border-top: 1px solid #333;
-                        width: 150px;
-                        margin-left: auto;
-                    }}
-                    .job-title {{
-                        font-weight: bold;
-                        margin-top: 5px;
-                    }}
-                    .job-title-en {{
-                        font-size: 11px;
-                        color: #666;
-                    }}
-                </style>
-            </head>
-            <body>
-                {watermark_html}
-
-                <div class="header">
-                    <div class="company-info">
-                        {logo_html}
-                        <div class="company-name">Auction Ethiopia S.C.</div>
-                        <div class="company-subtitle">PROCESSING FEE MANAGEMENT</div>
-                    </div>
-                    <div class="audit-ref">
-                        <div class="audit-ref-label">ጨረታ ቁጥር:</div>
-                        <div class="audit-ref-value">{auction_ref_number}</div>
-                    </div>
+        return f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <style>
+                body {{
+                    font-family: 'Noto Sans Ethiopic', sans-serif;
+                    font-size: 13px;
+                    color: #111;
+                    margin: 0;
+                    padding: 45px 55px 0 55px;
+                }}
+                .header {{ display: flex; justify-content: space-between; align-items: flex-start; }}
+                .logo img {{ width: 220px; }}
+                .ref-block {{ text-align: right; font-size: 13px; }}
+                .ref-block div {{ margin-bottom: 6px; }}
+                .ref-block .val {{ text-decoration: underline; }}
+                hr.rule {{ border: none; border-top: 1px solid #999; margin: 12px 0 30px 0; }}
+                .salutation {{ margin: 0 0 15px 0; font-size: 13px; }}
+                .subject {{
+                    text-align: center; font-weight: bold; text-decoration: underline;
+                    margin: 20px 0; font-size: 13px;
+                }}
+                .body-text {{ text-align: justify; line-height: 2; font-size: 13px; margin-bottom: 18px; }}
+                .closing {{ text-align: right; margin-top: 50px; font-size: 13px; }}
+                .stamp-sig-row {{
+                    display: flex; justify-content: space-between; align-items: flex-start;
+                    margin-top: 10px;
+                }}
+                .watermark {{
+                    position: fixed;
+                    left: 50%;
+                    top: 50%;
+                    transform: translate(-50%, -50%);
+                    opacity: 0.12;
+                    z-index: -1;
+                    width: 420px;
+                }}
+                .stamp-img {{ width: 150px; }}
+                .sig-block {{ text-align: right; font-size: 13px; }}
+                .sig-img {{ width: 120px; display: block; margin-left: auto; margin-bottom: 4px; }}
+                .footer-band {{ position: fixed; bottom: 0; left: 0; width: 100%; }}
+                .footer-band img {{ width: 100%; display: block; }}
+            </style>
+        </head>
+        <body>
+            <img class="watermark" src="data:image/png;base64,{images['watermark']}">
+            <div class="header">
+                <div class="logo"><img src="data:image/png;base64,{images['logo']}"></div>
+                <div class="ref-block">
+                    <div>ቀን: <span class="val">{invoice.invoiceDate.strftime('%d/%m/%Y')}</span></div>
+                    <div>ቁጥር: <span class="val">{invoice.invoiceNumber}</span></div>
                 </div>
+            </div>
+            <hr class="rule">
 
-                <div class="letter-opener">
-                    <p>ለደንበኞች ሂደ.</p>
-                    <p>ጠብ ጥሪት</p>
+            <div class="salutation">
+                <div>ለ {winner.bidderName}</div>
+                <div>ባሉበት</div>
+            </div>
+
+            <div class="subject">ጉዳይ፡- የጨረታ processing fee እንዲከፍሉ ስለማሳወቅ</div>
+
+            <div class="body-text">
+                {auction_name} ለኩባንያው አገልግሎት የሚያሰጡ የተለያዩ ዕቃዎችን በጨረታ አወዳድሮ ለመሸጥ ባወጣው የጨረታ ቁጥር {auction_ref_number} ተሳትፈው በሎት ቁጥር {lot_numbers} የተጠቀሱትን ለመግዛት ባቀረቡት ጠቅላላ ዋጋ ቫትን ጨምሮ ብር {total_amount:,.2f} ሲሆን የንብረቶቹን ርክክብ መመሪያ ተመልክተው ከተረከቡ በኋላ ከአሸነፉበት ዋጋ ላይ የሚታሰብ {fee_percentage}% (processing fee) {total_fee:,.2f} ለአክሽን ኢትዮጵያ የሚከፍሉ ይሆናል፡፡
+            </div>
+
+            <div class="body-text">
+                ስለሆነም በኢትዮጵያ ንግድ ባንክ የሂሳብ ቁጥር 1000547266289 ገቢ በማድረግ ቦሌ አትላስ ከአውሮፓ ዩኒየን ዝቅ ብሎ ከለላ ህንጻ 3ኛ ፎቅ ቢሮ ቁጥር 301 በአካል በመገኘት ደረሰኝ እንዲያስገቡ እንጠይቃለን፡፡
+            </div>
+
+            <div class="body-text">
+                ማሳሰቢያ፡- ለጨረታ መወዳደሪያ ያስያዙት ሲ.ፒ.ኦ ተመላሽ የሚደረገው processing fee መከፈላችሁ ከተረጋገጠ በኋላ ነው፡፡
+            </div>
+
+            <div class="closing">ከሰላምታ ጋር</div>
+
+            <div class="stamp-sig-row">
+                <img class="stamp-img" src="data:image/png;base64,{images['stamp']}">
+                <div class="sig-block">
+                    <img class="sig-img" src="data:image/png;base64,{images['signature']}">
+                    <div>ህዝቅኤል አየነው</div>
+                    <div>የደንበኞች አስተዳደር</div>
                 </div>
+            </div>
 
-                <div class="intro-text">
-                    ጭቃቂ- ደረሰኝ processing fee ኪሳራ ለጠ ተወደደዉ
-                </div>
-
-                <div class="recipient">
-                    <span class="recipient-label">ለ:</span>
-                    <span class="recipient-name">{winner.bidderName}</span>
-                </div>
-
-                <div class="intro-text">
-                    Processing fee invoice for auction lots won. Please find the details below:
-                </div>
-
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Lot Number</th>
-                            <th>Auction</th>
-                            <th style="text-align: right;">Winning Amount</th>
-                            <th style="text-align: right;">Processing Fee</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {lots_html}
-                        <tr class="total-row">
-                            <td colspan="3" style="text-align: right;">ጠቅላላ ዋጋ ቫትን ጨምሮ ብር:</td>
-                            <td style="text-align: right;">ETB {total_fee:,.2f}</td>
-                        </tr>
-                    </tbody>
-                </table>
-
-                <div class="footer-text">
-                    <p><strong>Payment Terms:</strong> Payment must be submitted within 3 working days of invoice date.</p>
-                    <p><strong>Invoice Date:</strong> {invoice.invoiceDate.strftime('%B %d, %Y')}</p>
-                    <p><strong>Due Date:</strong> {invoice.dueDate.strftime('%B %d, %Y')}</p>
-                </div>
-
-                <div style="text-align: center; margin: 30px 0;">
-                    {stamp_html}
-                </div>
-
-                <div class="signature-section">
-                    {signature_html}
-                    <div class="signature-line"></div>
-                    <div class="job-title">የደንበኞች አስተዳደር</div>
-                    <div class="job-title-en">(Customer Service)</div>
-                </div>
-            </body>
-            </html>
-            """
-
-            return html
-
+            <div class="footer-band"><img src="data:image/png;base64,{images['footer']}"></div>
+        </body>
+        </html>
+        """
     @action(detail=True, methods=['post'], url_path='change-status')
     def change_status(self, request, pk=None):
         invoice = self.get_object()

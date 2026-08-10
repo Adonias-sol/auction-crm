@@ -7,6 +7,7 @@ RUN apt-get update && apt-get install -y \
     libjpeg62-turbo \
     libopenjp2-7 \
     fontconfig \
+    fonts-noto-core \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

@@ -6,7 +6,7 @@ import { useState } from "react";
 export default function GeneratePdfModal({ invoices, onConfirm, onClose }) {
   const [pcts, setPcts] = useState(() => {
     const init = {};
-    invoices.forEach((inv) => { init[inv.id] = "0.95"; });
+    invoices.forEach((inv) => { init[inv.id] = String(inv.lots?.[0]?.feePercentage ?? "0.95"); });
     return init;
   });
 
@@ -90,7 +90,7 @@ export default function GeneratePdfModal({ invoices, onConfirm, onClose }) {
             <button className="btn btn-brass" onClick={handleConfirm}>Generate {invoices.length} PDF{multiple ? "s" : ""}</button>
             <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
           </div>
-        </div>
+        </div>  
       </div>
     </div>
   );

@@ -262,9 +262,9 @@ class InvoiceViewSet(viewsets.ModelViewSet):
                         z-index: -1;
                         width: 420px;
                         }}
-                    .stamp-img {{ width: 210px; margin-left: 10px; }}
-                    .sig-block {{ text-align: right; font-size: 14.5px; }}
-                    .sig-img {{ width: 130px; display: block; margin-left: auto; margin-bottom: 4px; }}
+                    .stamp-img {{ width: 250px; margin-left: 10px; }}
+                    .sig-block {{ text-align: right; font-size: 10.5px; }}
+                    .sig-img {{ width: 100px; display: block; margin-left: auto; margin-bottom: 4px; }}
                     .footer-band {{ position: fixed; bottom: 0; left: 0; width: 100%; }}
                     .footer-band img {{ width: 100%; display: block; }}
                 </style>

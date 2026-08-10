@@ -257,7 +257,7 @@ class InvoiceViewSet(viewsets.ModelViewSet):
                         position: fixed;
                         left: 50%;
                         top: 50%;
-                        transform: translate(-20%, -50%);
+                        transform: translate(-50%, -20%);
                         opacity: 0.3;
                         z-index: -1;
                         width: 500px;

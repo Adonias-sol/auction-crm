@@ -225,10 +225,10 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         <head>
             <meta charset="UTF-8">
             <style>
-                @page {
-                    size: A4;
+                @page {{
+                    size: A4;                   
                     margin: 0;
-                }
+                }}
                 body {{
                     font-family: 'Noto Sans Ethiopic', sans-serif;
                     font-size: 13px;

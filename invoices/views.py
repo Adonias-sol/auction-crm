@@ -212,7 +212,7 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         except Exception as e:
             return Response({'detail': f'PDF generation failed: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-        def _render_invoice_html(self, invoice, auction_ref_number='', logo_base64='', stamp_base64='', signature_base64='', watermark_base64=''):
+    def _render_invoice_html(self, invoice, auction_ref_number='', logo_base64='', stamp_base64='', signature_base64='', watermark_base64=''):
             """
             Render invoice as HTML matching Auction Ethiopia official Amharic letter format.
             """

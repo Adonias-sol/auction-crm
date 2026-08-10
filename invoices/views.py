@@ -206,113 +206,113 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             return Response({'detail': f'PDF generation failed: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def _render_invoice_html(self, invoice, auction_ref_number, images):
-        """
-        Matches the official Auction Ethiopia letter format exactly —
-        only the bracketed values below differ per invoice.
-        """
-        winner = invoice.winner
-        lots = list(invoice.lots.all())
+            """
+            Matches the official Auction Ethiopia letter format exactly —
+            only the bracketed values below differ per invoice.
+            """
+            winner = invoice.winner
+            lots = list(invoice.lots.all())
 
-        total_amount = sum((lot.winningAmount for lot in lots), Decimal('0.00'))
-        total_fee = sum((lot.lotFee for lot in lots), Decimal('0.00'))
-        fee_percentage = lots[0].feePercentage.normalize() if lots else Decimal('0')
-        auction_name = lots[0].auctionName if lots else ''
-        lot_numbers = _join_amharic_list([lot.lotNumber for lot in lots])
+            total_amount = sum((lot.winningAmount for lot in lots), Decimal('0.00'))
+            total_fee = sum((lot.lotFee for lot in lots), Decimal('0.00'))
+            fee_percentage = lots[0].feePercentage.normalize() if lots else Decimal('0')
+            auction_name = lots[0].auctionName if lots else ''
+            lot_numbers = _join_amharic_list([lot.lotNumber for lot in lots])
 
-        return f"""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta charset="UTF-8">
-            <style>
-                @page {{
-                    size: A4;                   
-                    margin: 0;
-                }}
-                body {{
-                    font-family: 'Noto Sans Ethiopic', sans-serif;
-                    font-size: 13px;
-                    color: #111;
-                    margin: 0;
-                    padding: 45px 55px 0 55px;
-                }}
-                .header {{ display: flex; justify-content: space-between; align-items: flex-start; }}
-                .logo img {{ width: 220px; }}
-                .ref-block {{ text-align: right; font-size: 13px; }}
-                .ref-block div {{ margin-bottom: 6px; }}
-                .ref-block .val {{ text-decoration: underline; }}
-                hr.rule {{ border: none; border-top: 1px solid #999; margin: 12px 0 30px 0; }}
-                .salutation {{ margin: 0 0 15px 0; font-size: 13px; }}
-                .subject {{
-                    text-align: center; font-weight: bold; text-decoration: underline;
-                    margin: 20px 0; font-size: 13px;
-                }}
-                .body-text {{ text-align: justify; line-height: 2; font-size: 13px; margin-bottom: 18px; }}
-                .closing {{ text-align: right; margin-top: 50px; font-size: 13px; }}
-                .stamp-sig-row {{
-                    display: flex; justify-content: space-between; align-items: flex-start;
-                    margin-top: 10px;
-                }}
-                .watermark {{
-                    position: fixed;
-                    left: 6%;
-                    bottom: 8% ;
-                    opacity: 0.12;
-                    z-index: -1;
-                    width: 280px;
-                }}
-                .stamp-img {{ width: 150px; }}
-                .sig-block {{ text-align: right; font-size: 13px; }}
-                .sig-img {{ width: 120px; display: block; margin-left: auto; margin-bottom: 4px; }}
-                .footer-band {{ position: fixed; bottom: 0; left: 0; width: 100%; }}
-                .footer-band img {{ width: 100%; display: block; }}
-            </style>
-        </head>
-        <body>
-            <img class="watermark" src="data:image/png;base64,{images['watermark']}">
-            <div class="header">
-                <div class="logo"><img src="data:image/png;base64,{images['logo']}"></div>
-                <div class="ref-block">
-                    <div>ቀን: <span class="val">{invoice.invoiceDate.strftime('%d/%m/%Y')}</span></div>
-                    <div>ቁጥር: <span class="val">{invoice.invoiceNumber}</span></div>
+            return f"""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="UTF-8">
+                <style>
+                    @page {{
+                        size: A4;                   
+                        margin: 0;
+                    }}
+                    body {{
+                        font-family: 'Noto Sans Ethiopic', sans-serif;
+                        font-size: 14.5px;
+                        color: #111;
+                        margin: 0;
+                        padding: 45px 55px 0 55px;
+                    }}
+                    .header {{ display: flex; justify-content: space-between; align-items: flex-start; }}
+                    .logo img {{ width: 240px; }}
+                    .ref-block {{ text-align: right; font-size: 14.5px; }}
+                    .ref-block div {{ margin-bottom: 6px; }}
+                    .ref-block .val {{ text-decoration: underline; }}
+                    hr.rule {{ border: none; border-top: 1px solid #999; margin: 12px 0 30px 0; }}
+                    .salutation {{ margin: 0 0 15px 0; font-size: 14.5px; }}
+                    .subject {{
+                        text-align: center; font-weight: bold; text-decoration: underline;
+                        margin: 20px 0; font-size: 14.5px;
+                    }}
+                    .body-text {{ text-align: justify; line-height: 2.1; font-size: 14.5px; margin-bottom: 18px; }}
+                    .closing {{ text-align: right; margin-top: 50px; font-size: 14.5px; }}
+                    .stamp-sig-row {{
+                        display: flex; justify-content: space-between; align-items: center;
+                        margin-top: 40px;
+                    }}
+                    .watermark {{
+                        position: fixed;
+                        left: 2%;
+                        bottom: 4%;
+                        opacity: 0.35;
+                        z-index: -1;
+                        width: 480px;
+                    }}
+                    .stamp-img {{ width: 210px; margin-left: 10px; }}
+                    .sig-block {{ text-align: right; font-size: 14.5px; }}
+                    .sig-img {{ width: 130px; display: block; margin-left: auto; margin-bottom: 4px; }}
+                    .footer-band {{ position: fixed; bottom: 0; left: 0; width: 100%; }}
+                    .footer-band img {{ width: 100%; display: block; }}
+                </style>
+            </head>
+            <body>
+                <img class="watermark" src="data:image/png;base64,{images['watermark']}">
+                <div class="header">
+                    <div class="logo"><img src="data:image/png;base64,{images['logo']}"></div>
+                    <div class="ref-block">
+                        <div>ቀን: <span class="val">{invoice.invoiceDate.strftime('%d/%m/%Y')}</span></div>
+                        <div>ቁጥር: <span class="val">{invoice.invoiceNumber}</span></div>
+                    </div>
                 </div>
-            </div>
-            <hr class="rule">
+                <hr class="rule">
 
-            <div class="salutation">
-                <div>ለ {winner.bidderName}</div>
-                <div>ባሉበት</div>
-            </div>
-
-            <div class="subject">ጉዳይ፡- የጨረታ processing fee እንዲከፍሉ ስለማሳወቅ</div>
-
-            <div class="body-text">
-                {auction_name} ለኩባንያው አገልግሎት የማያሰጡ የተለያዩ ዕቃዎችን በጨረታ አወዳድሮ ለመሸጥ ባወጣው የጨረታ ቁጥር {auction_ref_number} ተሳትፈው በሎት ቁጥር {lot_numbers} የተጠቀሱትን ለመግዛት ባቀረቡት ጠቅላላ ዋጋ ቫትን ጨምሮ ብር {total_amount:,.2f} ሲሆን የንብረቶቹን ርክክብ መመሪያ ተመልክተው ከተረከቡ በኋላ ከአሸነፉበት ዋጋ ላይ የሚታሰብ {fee_percentage}% (processing fee) {total_fee:,.2f} ለአክሽን ኢትዮጵያ የሚከፍሉ ይሆናል፡፡
-            </div>
-
-            <div class="body-text">
-                ስለሆነም በኢትዮጵያ ንግድ ባንክ የሂሳብ ቁጥር 1000547266289 ገቢ በማድረግ ቦሌ አትላስ ከአውሮፓ ዩኒየን ዝቅ ብሎ ከለላ ህንጻ 3ኛ ፎቅ ቢሮ ቁጥር 301 በአካል በመገኘት ደረሰኝ እንዲያስገቡ እንጠይቃለን፡፡
-            </div>
-
-            <div class="body-text">
-                ማሳሰቢያ፡- ለጨረታ መወዳደሪያ ያስያዙት ሲ.ፒ.ኦ ተመላሽ የሚደረገው processing fee መከፈላችሁ ከተረጋገጠ በኋላ ነው፡፡
-            </div>
-
-            <div class="closing">ከሰላምታ ጋር</div>
-
-            <div class="stamp-sig-row">
-                <img class="stamp-img" src="data:image/png;base64,{images['stamp']}">
-                <div class="sig-block">
-                    <img class="sig-img" src="data:image/png;base64,{images['signature']}">
-                    <div>ህዝቅኤል አየነው</div>
-                    <div>የደንበኞች አስተዳደር</div>
+                <div class="salutation">
+                    <div>ለ {winner.bidderName}</div>
+                    <div>ባሉበት</div>
                 </div>
-            </div>
 
-            <div class="footer-band"><img src="data:image/png;base64,{images['footer']}"></div>
-        </body>
-        </html>
-        """
+                <div class="subject">ጉዳይ፡- የጨረታ processing fee እንዲከፍሉ ስለማሳወቅ</div>
+
+                <div class="body-text">
+                    {auction_name} ለኩባንያው አገልግሎት የማያሰጡ የተለያዩ ዕቃዎችን በጨረታ አወዳድሮ ለመሸጥ ባወጣው የጨረታ ቁጥር {auction_ref_number} ተሳትፈው በሎት ቁጥር {lot_numbers} የተጠቀሱትን ለመግዛት ባቀረቡት ጠቅላላ ዋጋ ቫትን ጨምሮ ብር {total_amount:,.2f} ሲሆን የንብረቶቹን ርክክብ መመሪያ ተመልክተው ከተረከቡ በኋላ ከአሸነፉበት ዋጋ ላይ የሚታሰብ {fee_percentage}% (processing fee) {total_fee:,.2f} ለአክሽን ኢትዮጵያ የሚከፍሉ ይሆናል፡፡
+                </div>
+
+                <div class="body-text">
+                    ስለሆነም በኢትዮጵያ ንግድ ባንክ የሂሳብ ቁጥር 1000547266289 ገቢ በማድረግ ቦሌ አትላስ ከአውሮፓ ዩኒየን ዝቅ ብሎ ከለላ ህንጻ 3ኛ ፎቅ ቢሮ ቁጥር 301 በአካል በመገኘት ደረሰኝ እንዲያስገቡ እንጠይቃለን፡፡
+                </div>
+
+                <div class="body-text">
+                    ማሳሰቢያ፡- ለጨረታ መወዳደሪያ ያስያዙት ሲ.ፒ.ኦ ተመላሽ የሚደረገው processing fee መከፈላችሁ ከተረጋገጠ በኋላ ነው፡፡
+                </div>
+
+                <div class="closing">ከሰላምታ ጋር</div>
+
+                <div class="stamp-sig-row">
+                    <img class="stamp-img" src="data:image/png;base64,{images['stamp']}">
+                    <div class="sig-block">
+                        <img class="sig-img" src="data:image/png;base64,{images['signature']}">
+                        <div>ህዝቅኤል አየነው</div>
+                        <div>የደንበኞች አስተዳደር</div>
+                    </div>
+                </div>
+
+                <div class="footer-band"><img src="data:image/png;base64,{images['footer']}"></div>
+            </body>
+            </html>
+            """
     @action(detail=True, methods=['post'], url_path='change-status')
     def change_status(self, request, pk=None):
         invoice = self.get_object()

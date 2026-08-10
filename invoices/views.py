@@ -225,6 +225,10 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         <head>
             <meta charset="UTF-8">
             <style>
+                @page {
+                    size: A4;
+                    margin: 0;
+                }
                 body {{
                     font-family: 'Noto Sans Ethiopic', sans-serif;
                     font-size: 13px;
@@ -251,12 +255,11 @@ class InvoiceViewSet(viewsets.ModelViewSet):
                 }}
                 .watermark {{
                     position: fixed;
-                    left: 50%;
-                    top: 50%;
-                    transform: translate(-50%, -50%);
+                    left: 6%;
+                    bottom: 8% ;
                     opacity: 0.12;
                     z-index: -1;
-                    width: 420px;
+                    width: 28px;
                 }}
                 .stamp-img {{ width: 150px; }}
                 .sig-block {{ text-align: right; font-size: 13px; }}
@@ -284,7 +287,7 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             <div class="subject">ጉዳይ፡- የጨረታ processing fee እንዲከፍሉ ስለማሳወቅ</div>
 
             <div class="body-text">
-                {auction_name} ለኩባንያው አገልግሎት የሚያሰጡ የተለያዩ ዕቃዎችን በጨረታ አወዳድሮ ለመሸጥ ባወጣው የጨረታ ቁጥር {auction_ref_number} ተሳትፈው በሎት ቁጥር {lot_numbers} የተጠቀሱትን ለመግዛት ባቀረቡት ጠቅላላ ዋጋ ቫትን ጨምሮ ብር {total_amount:,.2f} ሲሆን የንብረቶቹን ርክክብ መመሪያ ተመልክተው ከተረከቡ በኋላ ከአሸነፉበት ዋጋ ላይ የሚታሰብ {fee_percentage}% (processing fee) {total_fee:,.2f} ለአክሽን ኢትዮጵያ የሚከፍሉ ይሆናል፡፡
+                {auction_name} ለኩባንያው አገልግሎት የማያሰጡ የተለያዩ ዕቃዎችን በጨረታ አወዳድሮ ለመሸጥ ባወጣው የጨረታ ቁጥር {auction_ref_number} ተሳትፈው በሎት ቁጥር {lot_numbers} የተጠቀሱትን ለመግዛት ባቀረቡት ጠቅላላ ዋጋ ቫትን ጨምሮ ብር {total_amount:,.2f} ሲሆን የንብረቶቹን ርክክብ መመሪያ ተመልክተው ከተረከቡ በኋላ ከአሸነፉበት ዋጋ ላይ የሚታሰብ {fee_percentage}% (processing fee) {total_fee:,.2f} ለአክሽን ኢትዮጵያ የሚከፍሉ ይሆናል፡፡
             </div>
 
             <div class="body-text">

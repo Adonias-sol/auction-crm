@@ -33,17 +33,6 @@ def log_audit(invoice, action_label, user, previous_value='', new_value='', reas
     One place that writes AuditLog rows, so every view stays consistent
     with what admin.py already enforces (read-only, code-created only).
     """
-    def _join_amharic_list(items):
-        """'A' / 'A እና B' / 'A, B እና C' — Amharic-style list joining."""
-        items = [str(i) for i in items]
-        if not items:
-            return ""
-        if len(items) == 1:
-            return items[0]
-        if len(items) == 2:
-            return f"{items[0]} እና {items[1]}"
-        return ", ".join(items[:-1]) + f" እና {items[-1]}"
-
     AuditLog.objects.create(
         invoice=invoice,
         action=action_label,
@@ -53,7 +42,16 @@ def log_audit(invoice, action_label, user, previous_value='', new_value='', reas
         newValue=str(new_value),
         reason=reason,
     )
-
+def _join_amharic_list(items):
+        """'A' / 'A እና B' / 'A, B እና C' — Amharic-style list joining."""
+        items = [str(i) for i in items]
+        if not items:
+            return ""
+        if len(items) == 1:
+            return items[0]
+        if len(items) == 2:
+            return f"{items[0]} እና {items[1]}"
+        return ", ".join(items[:-1]) + f" እና {items[-1]}"
 
 class AuctionViewSet(viewsets.ModelViewSet):
     queryset = Auction.objects.all().order_by('-auctionDate')

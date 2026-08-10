@@ -204,7 +204,7 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         except Exception as e:
             return Response({'detail': f'PDF generation failed: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-        def _render_invoice_html(self, invoice, auction_ref_number='' , logo_base64='', stamp_base64='', signature_base64='', watermark_base64=''):
+        def _render_invoice_html(self, invoice, auction_ref_number='', logo_base64='', stamp_base64='', signature_base64='', watermark_base64=''):
             """
             Render invoice as HTML matching Auction Ethiopia official Amharic letter format.
             """
@@ -223,6 +223,12 @@ class InvoiceViewSet(viewsets.ModelViewSet):
                 </tr>
                 """
 
+            # Build image HTML outside main template
+            watermark_html = f'<img src="data:image/png;base64,{watermark_base64}" class="watermark" />' if watermark_base64 else ''
+            logo_html = f'<img src="data:image/png;base64,{logo_base64}" style="max-width: 120px; margin-bottom: 10px;" />' if logo_base64 else ''
+            stamp_html = f'<img src="data:image/png;base64,{stamp_base64}" style="max-width: 150px;" />' if stamp_base64 else '<div style="font-size: 24px; color: #999;">[OFFICIAL STAMP]</div>'
+            signature_html = f'<img src="data:image/png;base64,{signature_base64}" style="max-width: 150px; margin-bottom: 10px;" />' if signature_base64 else '<div style="font-size: 24px; color: #999;">[SIGNATURE]</div>'
+
             html = f"""
             <!DOCTYPE html>
             <html>
@@ -234,6 +240,16 @@ class InvoiceViewSet(viewsets.ModelViewSet):
                         margin: 40px;
                         color: #333;
                         line-height: 1.5;
+                    }}
+                    .watermark {{
+                        position: fixed;
+                        left: 50%;
+                        top: 50%;
+                        transform: translate(-50%, -50%);
+                        opacity: 0.1;
+                        z-index: -1;
+                        width: 400px;
+                        height: 400px;
                     }}
                     .header {{
                         display: flex;
@@ -338,25 +354,15 @@ class InvoiceViewSet(viewsets.ModelViewSet):
                         font-size: 11px;
                         color: #666;
                     }}
-                    .watermark {{
-                        position: fixed;
-                        left: 50%;
-                        top: 50%;
-                        transform: translate(-50%, -50%);
-                        opacity: 0.1;
-                        z-index: -1;
-                        width: 400px;
-                        height: 400px;
-                    }}
                 </style>
             </head>
             <body>
-               
-                {f'<img src="data:image/png;base64,{watermark_base64}" class="watermark" />' if watermark_base64 else ''}
-               <div class="header">
-                <div class="company-info">
-                        {f'<img src="data:image/png;base64,{logo_base64}" style="max-width: 120px; margin-bottom: 10px;" />' if logo_base64 else ''}
-                <div class="company-name">Auction Ethiopia S.C.</div>
+                {watermark_html}
+
+                <div class="header">
+                    <div class="company-info">
+                        {logo_html}
+                        <div class="company-name">Auction Ethiopia S.C.</div>
                         <div class="company-subtitle">PROCESSING FEE MANAGEMENT</div>
                     </div>
                     <div class="audit-ref">
@@ -408,16 +414,16 @@ class InvoiceViewSet(viewsets.ModelViewSet):
                 </div>
 
                 <div style="text-align: center; margin: 30px 0;">
-                    {f'<img src="data:image/png;base64,{stamp_base64}" style="max-width: 150px;" />' if stamp_base64 else '<div style="font-size: 24px; color: #999;">[OFFICIAL STAMP]</div>'}
+                    {stamp_html}
                 </div>
 
                 <div class="signature-section">
-                    {f'<img src="data:image/png;base64,{signature_base64}" style="max-width: 150px; margin-bottom: 10px;" />' if signature_base64 else '<div style="font-size: 24px; color: #999;">[SIGNATURE]</div>'}
+                    {signature_html}
                     <div class="signature-line"></div>
                     <div class="job-title">የደንበኞች አስተዳደር</div>
                     <div class="job-title-en">(Customer Service)</div>
                 </div>
-                    </body>
+            </body>
             </html>
             """
 

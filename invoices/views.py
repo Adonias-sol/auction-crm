@@ -255,7 +255,7 @@ class InvoiceViewSet(viewsets.ModelViewSet):
                     }}
                     .watermark {{
                         position: fixed;
-                        left: 50%;
+                        left: 25%;
                         top: 50%;
                         transform: translate(-50%, -20%);
                         opacity: 0.3;

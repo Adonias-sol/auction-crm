@@ -257,10 +257,10 @@ class InvoiceViewSet(viewsets.ModelViewSet):
                         position: fixed;
                         left: 50%;
                         top: 50%;
-                        transform: translate(-50%, -50%);
-                        opacity: 0.12;
+                        transform: translate(-20%, -50%);
+                        opacity: 0.3;
                         z-index: -1;
-                        width: 420px;
+                        width: 500px;
                         }}
                     .stamp-img {{ width: 250px; margin-left: 10px; }}
                     .sig-block {{ text-align: right; font-size: 10.5px; }}

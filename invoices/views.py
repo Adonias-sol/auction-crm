@@ -253,14 +253,15 @@ class InvoiceViewSet(viewsets.ModelViewSet):
                         display: flex; justify-content: space-between; align-items: center;
                         margin-top: 40px;
                     }}
-                    .watermark {{
-                        position: fixed;
-                        left: 2%;
-                        bottom: 4%;
-                        opacity: 0.35;
-                        z-index: -1;
-                        width: 480px;
-                    }}
+                     .watermark {{
+                            position: fixed;
+                            left: 50%;
+                            top: 50%;
+                            transform: translate(-50%, -50%);
+                            opacity: 0.12;
+                            z-index: -1;
+                            width: 420px;
+                        }}
                     .stamp-img {{ width: 210px; margin-left: 10px; }}
                     .sig-block {{ text-align: right; font-size: 14.5px; }}
                     .sig-img {{ width: 130px; display: block; margin-left: auto; margin-bottom: 4px; }}

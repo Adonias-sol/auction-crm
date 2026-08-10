@@ -260,11 +260,11 @@ class InvoiceViewSet(viewsets.ModelViewSet):
                         transform: translate(-50%, -20%);
                         opacity: 0.3;
                         z-index: -1;
-                        width: 700px;
+                        width: 900px;
                         }}
                     .stamp-img {{ width: 250px; margin-left: 10px; }}
                     .sig-block {{ text-align: right; font-size: 10.5px; }}
-                    .sig-img {{ width: 100px; display: block; margin-left: auto; margin-bottom: 4px; }}
+                    .sig-img {{ width: 60px; display: block; margin-left: auto; margin-bottom: 4px; }}
                     .footer-band {{ position: fixed; bottom: 0; left: 0; width: 100%; }}
                     .footer-band img {{ width: 100%; display: block; }}
                 </style>

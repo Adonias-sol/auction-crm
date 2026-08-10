@@ -12,6 +12,9 @@ from .pagination import StandardPagination
 from io import BytesIO
 from decimal import Decimal
 from weasyprint import HTML
+import base64
+import os
+from django.conf import settings
 
 from .models import (
     Auction, Winner, Invoice, InvoiceLot, Payment, Attachment, FeeConfig, AuditLog,
@@ -170,8 +173,24 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             log_audit(invoice, 'Generate invoice PDF', request.user, previous, invoice.status)
 
         # Generate HTML
-        html_string = self._render_invoice_html(invoice, auction_ref_number)
+        # Read logo as base64
+        # Read logo as base64
 
+        # Read all images as base64
+
+        def read_image(filename):
+            path = os.path.join(settings.BASE_DIR, 'invoices', 'static', filename)
+            if os.path.exists(path):
+                with open(path, 'rb') as f:
+                    return base64.b64encode(f.read()).decode()
+            return ""
+
+        logo_base64 = read_image('logo.png')
+        stamp_base64 = read_image('stamp.png')
+        signature_base64 = read_image('signature.png')
+        watermark_base64 = read_image('watermark.png')
+
+        html_string = self._render_invoice_html(invoice, auction_ref_number, logo_base64, stamp_base64, signature_base64, watermark_base64)
         try:
             # Use WeasyPrint to generate PDF
             pdf_bytes = HTML(string=html_string).write_pdf()
@@ -185,171 +204,224 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         except Exception as e:
             return Response({'detail': f'PDF generation failed: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    def _render_invoice_html(self, invoice, auction_ref_number=''):
-        """
-        Render invoice as HTML matching Auction Ethiopia official Amharic letter format.
-        """
-        winner = invoice.winner
-        lots_html = ""
-        total_fee = Decimal('0.00')
+        def _render_invoice_html(self, invoice, auction_ref_number='' , logo_base64='', stamp_base64='', signature_base64='', watermark_base64=''):
+            """
+            Render invoice as HTML matching Auction Ethiopia official Amharic letter format.
+            """
+            winner = invoice.winner
+            lots_html = ""
+            total_fee = Decimal('0.00')
 
-        for lot in invoice.lots.all():
-            total_fee += lot.lotFee
-            lots_html += f"""
-            <tr>
-                <td>{lot.lotNumber}</td>
-                <td>{lot.auctionName}</td>
-                <td class="amount">ETB {lot.winningAmount:,.2f}</td>
-                <td class="amount">ETB {lot.lotFee:,.2f}</td>
-            </tr>
+            for lot in invoice.lots.all():
+                total_fee += lot.lotFee
+                lots_html += f"""
+                <tr>
+                    <td style="padding: 8px; border: 1px solid #ddd;">{lot.lotNumber}</td>
+                    <td style="padding: 8px; border: 1px solid #ddd;">{lot.auctionName}</td>
+                    <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">ETB {lot.winningAmount:,.2f}</td>
+                    <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">ETB {lot.lotFee:,.2f}</td>
+                </tr>
+                """
+
+            html = f"""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="UTF-8">
+                <style>
+                    body {{
+                        font-family: Arial, sans-serif;
+                        margin: 40px;
+                        color: #333;
+                        line-height: 1.5;
+                    }}
+                    .header {{
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: flex-start;
+                        margin-bottom: 40px;
+                        border-bottom: 2px solid #333;
+                        padding-bottom: 20px;
+                    }}
+                    .company-info {{
+                        text-align: center;
+                        flex: 1;
+                    }}
+                    .company-name {{
+                        font-size: 20px;
+                        font-weight: bold;
+                    }}
+                    .company-subtitle {{
+                        font-size: 12px;
+                        color: #666;
+                    }}
+                    .audit-ref {{
+                        text-align: right;
+                    }}
+                    .audit-ref-label {{
+                        font-size: 11px;
+                        color: #666;
+                    }}
+                    .audit-ref-value {{
+                        font-size: 12px;
+                        font-weight: bold;
+                    }}
+                    .letter-opener {{
+                        margin: 30px 0;
+                    }}
+                    .letter-opener p {{
+                        margin: 8px 0;
+                        font-size: 13px;
+                    }}
+                    .recipient {{
+                        margin: 20px 0;
+                        font-size: 13px;
+                    }}
+                    .recipient-label {{
+                        font-weight: bold;
+                        display: inline-block;
+                        width: 30px;
+                    }}
+                    .recipient-name {{
+                        display: inline-block;
+                    }}
+                    .intro-text {{
+                        margin: 20px 0;
+                        font-size: 13px;
+                        line-height: 1.6;
+                    }}
+                    table {{
+                        width: 100%;
+                        border-collapse: collapse;
+                        margin: 30px 0;
+                        font-size: 12px;
+                    }}
+                    th {{
+                        background-color: #f5f5f5;
+                        border: 1px solid #ddd;
+                        padding: 10px;
+                        text-align: left;
+                        font-weight: bold;
+                    }}
+                    td {{
+                        padding: 8px;
+                        border: 1px solid #ddd;
+                    }}
+                    .total-row {{
+                        background-color: #f9f9f9;
+                        font-weight: bold;
+                    }}
+                    .total-row td {{
+                        padding: 12px 8px;
+                    }}
+                    .footer-text {{
+                        margin-top: 30px;
+                        font-size: 12px;
+                        line-height: 1.6;
+                    }}
+                    .signature-section {{
+                        margin-top: 50px;
+                        text-align: right;
+                        font-size: 12px;
+                    }}
+                    .signature-line {{
+                        margin-top: 40px;
+                        border-top: 1px solid #333;
+                        width: 150px;
+                        margin-left: auto;
+                    }}
+                    .job-title {{
+                        font-weight: bold;
+                        margin-top: 5px;
+                    }}
+                    .job-title-en {{
+                        font-size: 11px;
+                        color: #666;
+                    }}
+                    .watermark {{
+                        position: fixed;
+                        left: 50%;
+                        top: 50%;
+                        transform: translate(-50%, -50%);
+                        opacity: 0.1;
+                        z-index: -1;
+                        width: 400px;
+                        height: 400px;
+                    }}
+                </style>
+            </head>
+            <body>
+               
+                {f'<img src="data:image/png;base64,{watermark_base64}" class="watermark" />' if watermark_base64 else ''}
+               <div class="header">
+                <div class="company-info">
+                        {f'<img src="data:image/png;base64,{logo_base64}" style="max-width: 120px; margin-bottom: 10px;" />' if logo_base64 else ''}
+                <div class="company-name">Auction Ethiopia S.C.</div>
+                        <div class="company-subtitle">PROCESSING FEE MANAGEMENT</div>
+                    </div>
+                    <div class="audit-ref">
+                        <div class="audit-ref-label">ጨረታ ቁጥር:</div>
+                        <div class="audit-ref-value">{auction_ref_number}</div>
+                    </div>
+                </div>
+
+                <div class="letter-opener">
+                    <p>ለደንበኞች ሂደ.</p>
+                    <p>ጠብ ጥሪት</p>
+                </div>
+
+                <div class="intro-text">
+                    ጭቃቂ- ደረሰኝ processing fee ኪሳራ ለጠ ተወደደዉ
+                </div>
+
+                <div class="recipient">
+                    <span class="recipient-label">ለ:</span>
+                    <span class="recipient-name">{winner.bidderName}</span>
+                </div>
+
+                <div class="intro-text">
+                    Processing fee invoice for auction lots won. Please find the details below:
+                </div>
+
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Lot Number</th>
+                            <th>Auction</th>
+                            <th style="text-align: right;">Winning Amount</th>
+                            <th style="text-align: right;">Processing Fee</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {lots_html}
+                        <tr class="total-row">
+                            <td colspan="3" style="text-align: right;">ጠቅላላ ዋጋ ቫትን ጨምሮ ብር:</td>
+                            <td style="text-align: right;">ETB {total_fee:,.2f}</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <div class="footer-text">
+                    <p><strong>Payment Terms:</strong> Payment must be submitted within 3 working days of invoice date.</p>
+                    <p><strong>Invoice Date:</strong> {invoice.invoiceDate.strftime('%B %d, %Y')}</p>
+                    <p><strong>Due Date:</strong> {invoice.dueDate.strftime('%B %d, %Y')}</p>
+                </div>
+
+                <div style="text-align: center; margin: 30px 0;">
+                    {f'<img src="data:image/png;base64,{stamp_base64}" style="max-width: 150px;" />' if stamp_base64 else '<div style="font-size: 24px; color: #999;">[OFFICIAL STAMP]</div>'}
+                </div>
+
+                <div class="signature-section">
+                    {f'<img src="data:image/png;base64,{signature_base64}" style="max-width: 150px; margin-bottom: 10px;" />' if signature_base64 else '<div style="font-size: 24px; color: #999;">[SIGNATURE]</div>'}
+                    <div class="signature-line"></div>
+                    <div class="job-title">የደንበኞች አስተዳደር</div>
+                    <div class="job-title-en">(Customer Service)</div>
+                </div>
+                    </body>
+            </html>
             """
 
-        html = f"""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta charset="UTF-8">
-            <style>
-                body {{
-                    font-family: Arial, sans-serif;
-                    margin: 30px;
-                    color: #333;
-                    line-height: 1.6;
-                }}
-                .header {{
-                    text-align: center;
-                    margin-bottom: 40px;
-                    border-bottom: 2px solid #333;
-                    padding-bottom: 20px;
-                }}
-                .logo {{
-                    font-size: 18px;
-                    font-weight: bold;
-                    margin-bottom: 5px;
-                }}
-                .auction-ref {{
-                    text-align: right;
-                    margin-bottom: 20px;
-                    font-weight: bold;
-                }}
-                .letter-header {{
-                    margin-bottom: 30px;
-                }}
-                .letter-header p {{
-                    margin: 5px 0;
-                }}
-                .recipient {{
-                    margin-bottom: 30px;
-                }}
-                .recipient-label {{
-                    font-weight: bold;
-                }}
-                .recipient-value {{
-                    margin-left: 20px;
-                }}
-                .intro-text {{
-                    margin-bottom: 20px;
-                    font-style: italic;
-                }}
-                table {{
-                    width: 100%;
-                    border-collapse: collapse;
-                    margin: 20px 0;
-                }}
-                th {{
-                    background-color: #f5f5f5;
-                    border: 1px solid #ddd;
-                    padding: 10px;
-                    text-align: left;
-                    font-weight: bold;
-                }}
-                td {{
-                    border: 1px solid #ddd;
-                    padding: 10px;
-                }}
-                .amount {{
-                    text-align: right;
-                }}
-                .total-row {{
-                    background-color: #f9f9f9;
-                    font-weight: bold;
-                }}
-                .footer {{
-                    margin-top: 40px;
-                    font-size: 12px;
-                }}
-                .signature-section {{
-                    margin-top: 40px;
-                    text-align: right;
-                }}
-                .job-title {{
-                    font-weight: bold;
-                    margin-top: 10px;
-                }}
-            </style>
-        </head>
-        <body>
-            <div class="auction-ref">
-                ጨረታ ቁጥር: {auction_ref_number}
-            </div>
-
-            <div class="header">
-                <div class="logo">Auction Ethiopia S.C.</div>
-                <div style="font-size: 12px; color: #666;">PROCESSING FEE MANAGEMENT</div>
-            </div>
-
-            <div class="letter-header">
-                <p>ለደንበኞች ሂደ.</p>
-                <p>ጠብ ጥሪት</p>
-            </div>
-
-            <div class="intro-text">
-                ጭቃቂ- ደረሰኝ processing fee ኪሳራ ለጠ ተወደደዉ
-            </div>
-
-            <div class="recipient">
-                <div class="recipient-label">ለ:</div>
-                <div class="recipient-value">{winner.bidderName}</div>
-            </div>
-
-            <div class="intro-text">
-                Processing fee invoice for auction lots won
-            </div>
-
-            <table>
-                <thead>
-                    <tr>
-                        <th>Lot Number</th>
-                        <th>Auction</th>
-                        <th class="amount">Winning Amount</th>
-                        <th class="amount">Processing Fee</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {lots_html}
-                    <tr class="total-row">
-                        <td colspan="3" style="text-align: right;">ጠቅላላ ዋጋ ቫትን ጨምሮ ብር:</td>
-                        <td class="amount">ETB {total_fee:,.2f}</td>
-                    </tr>
-                </tbody>
-            </table>
-
-            <div class="footer">
-                <p>Payment must be submitted within 3 working days of invoice date.</p>
-                <p>Invoice Date: {invoice.invoiceDate.strftime('%B %d, %Y')}</p>
-                <p>Due Date: {invoice.dueDate.strftime('%B %d, %Y')}</p>
-            </div>
-
-            <div class="signature-section">
-                <p style="margin-top: 50px;">_____________________</p>
-                <div class="job-title">የደንበኞች አስተዳደር</div>
-                <div style="font-size: 12px; color: #666;">(Customer Service)</div>
-            </div>
-        </body>
-        </html>
-        """
-
-        return html
+            return html
 
     @action(detail=True, methods=['post'], url_path='change-status')
     def change_status(self, request, pk=None):

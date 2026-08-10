@@ -149,16 +149,14 @@ class InvoiceViewSet(viewsets.ModelViewSet):
     def generate_pdf(self, request, pk=None):
         """
         POST /api/invoices/{id}/generate-pdf/
-        Body: {feePercentage}
-        Generates PDF via WeasyPrint with Amharic support.
         """
         invoice = self.get_object()
         
         if request.user.profile.role not in ['finance_manager', 'auction_manager', 'administrator']:
             return Response({'detail': 'Not allowed'}, status=status.HTTP_403_FORBIDDEN)
         
-        auction_ref_number = request.data.get('auctionRefNumber', '')
         fee_percentage = request.data.get('feePercentage')
+        auction_ref_number = request.data.get('auctionRefNumber', '')
 
         if fee_percentage is not None:
             fee_percentage = Decimal(str(fee_percentage))
@@ -172,29 +170,39 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             invoice.save(update_fields=['status', 'updatedAt'])
             log_audit(invoice, 'Generate invoice PDF', request.user, previous, invoice.status)
 
-        # Generate HTML
-        # Read logo as base64
-        # Read logo as base64
-
-        # Read all images as base64
-
-        def read_image(filename):
-            path = os.path.join(settings.BASE_DIR, 'invoices', 'static', filename)
-            if os.path.exists(path):
-                with open(path, 'rb') as f:
-                    return base64.b64encode(f.read()).decode()
-            return ""
-
-        logo_base64 = read_image('logo.png')
-        stamp_base64 = read_image('stamp.png')
-        signature_base64 = read_image('signature.png')
-        watermark_base64 = read_image('watermark.png')
+        # Read images as base64
+        import base64
+        import os
+        from django.conf import settings
+        
+        logo_base64 = ''
+        stamp_base64 = ''
+        signature_base64 = ''
+        watermark_base64 = ''
+        
+        static_dir = os.path.join(settings.BASE_DIR, 'invoices', 'static')
+        
+        for filename, var_name in [('logo.png', 'logo_base64'), ('stamp.png', 'stamp_base64'), ('signature.png', 'signature_base64'), ('watermark.png', 'watermark_base64')]:
+            filepath = os.path.join(static_dir, filename)
+            if os.path.exists(filepath):
+                try:
+                    with open(filepath, 'rb') as f:
+                        encoded = base64.b64encode(f.read()).decode('utf-8')
+                        if var_name == 'logo_base64':
+                            logo_base64 = encoded
+                        elif var_name == 'stamp_base64':
+                            stamp_base64 = encoded
+                        elif var_name == 'signature_base64':
+                            signature_base64 = encoded
+                        elif var_name == 'watermark_base64':
+                            watermark_base64 = encoded
+                except Exception as e:
+                    pass
 
         html_string = self._render_invoice_html(invoice, auction_ref_number, logo_base64, stamp_base64, signature_base64, watermark_base64)
+
         try:
-            # Use WeasyPrint to generate PDF
             pdf_bytes = HTML(string=html_string).write_pdf()
-            
             return FileResponse(
                 BytesIO(pdf_bytes),
                 as_attachment=True,

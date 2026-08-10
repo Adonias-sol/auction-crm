@@ -255,12 +255,12 @@ class InvoiceViewSet(viewsets.ModelViewSet):
                     }}
                     .watermark {{
                         position: fixed;
-                        left: 25%;
+                        left: 20%;
                         top: 50%;
                         transform: translate(-50%, -20%);
                         opacity: 0.3;
                         z-index: -1;
-                        width: 500px;
+                        width: 700px;
                         }}
                     .stamp-img {{ width: 250px; margin-left: 10px; }}
                     .sig-block {{ text-align: right; font-size: 10.5px; }}

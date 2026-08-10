@@ -193,9 +193,10 @@ class InvoiceViewSet(viewsets.ModelViewSet):
                 with open(filepath, 'rb') as f:
                     images[key] = base64.b64encode(f.read()).decode('utf-8')
 
-        html_string = self._render_invoice_html(invoice, auction_ref_number, images)
+        
 
         try:
+            html_string = self._render_invoice_html(invoice, auction_ref_number, images)
             pdf_bytes = HTML(string=html_string).write_pdf()
             return FileResponse(
                 BytesIO(pdf_bytes),

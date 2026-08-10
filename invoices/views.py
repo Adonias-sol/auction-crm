@@ -259,7 +259,7 @@ class InvoiceViewSet(viewsets.ModelViewSet):
                     bottom: 8% ;
                     opacity: 0.12;
                     z-index: -1;
-                    width: 28px;
+                    width: 280px;
                 }}
                 .stamp-img {{ width: 150px; }}
                 .sig-block {{ text-align: right; font-size: 13px; }}

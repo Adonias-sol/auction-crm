@@ -231,7 +231,7 @@ class InvoiceViewSet(viewsets.ModelViewSet):
                     }}
                     body {{
                         font-family: 'Noto Sans Ethiopic', sans-serif;
-                        font-size: 14.5px;
+                        font-size: 16.5px;
                         color: #111;
                         margin: 0;
                         padding: 45px 55px 0 55px;

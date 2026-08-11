@@ -12,7 +12,7 @@ export default function StatusCell({ invoice, role, onChangeStatus }) {
         autoFocus
         className="status-select"
         value={invoice.status}
-        onChange={(e) => { onChangeStatus(invoice.inv, e.target.value); setEditing(false); }}
+        onChange={(e) => { onChangeStatus(invoice.id, e.target.value); setEditing(false); }}
         onBlur={() => setEditing(false)}
       >
         {Object.keys(statusLabels).map((k) => (

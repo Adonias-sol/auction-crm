@@ -35,6 +35,7 @@ class WinnerSerializer(serializers.ModelSerializer):
             'id', 'bidderName', 'companyName', 'winnerPhone', 'winnerEmail',
             'auction', 'importBatch', 'winningAmount', 'initialPrice',
             'cpoAmount', 'cpoBank', 'submittedAt', 'createdAt',
+            'bidderNameAmharic',
         ]
 
 

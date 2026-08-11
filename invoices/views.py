@@ -11,7 +11,7 @@ from rest_framework.pagination import PageNumberPagination
 from .pagination import StandardPagination
 from io import BytesIO
 from decimal import Decimal
-from weasyprint import HTML
+
 import base64
 import os
 from django.conf import settings
@@ -157,6 +157,7 @@ class InvoiceViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'], url_path='generate-pdf')
     def generate_pdf(self, request, pk=None):
+        from weasyprint import HTML
         """
         POST /api/invoices/{id}/generate-pdf/
         Body: {feePercentage, auctionRefNumber}
@@ -167,13 +168,18 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             return Response({'detail': 'Not allowed'}, status=status.HTTP_403_FORBIDDEN)
 
         fee_percentage = request.data.get('feePercentage')
-        auction_ref_number = request.data.get('auctionRefNumber', '')
+        auction_ref_number = request.data.get('auctionRefNumber', '')\
+        
+        bidder_name_amharic = request.data.get('bidderNameAmharic', '').strip()
 
         if fee_percentage is not None:
             fee_percentage = Decimal(str(fee_percentage))
             for lot in invoice.lots.all():
                 lot.feePercentage = fee_percentage
                 lot.save()
+        if bidder_name_amharic:
+            invoice.winner.bidderNameAmharic = bidder_name_amharic
+            invoice.winner.save(update_fields=['bidderNameAmharic'])
 
         if invoice.status == 'invoice_generated':
             previous = invoice.status
@@ -211,6 +217,7 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             only the bracketed values below differ per invoice.
             """
             winner = invoice.winner
+            display_name = winner.bidderNameAmharic or winner.bidderName
             lots = list(invoice.lots.all())
 
             total_amount = sum((lot.winningAmount for lot in lots), Decimal('0.00'))
@@ -281,7 +288,7 @@ class InvoiceViewSet(viewsets.ModelViewSet):
                 <hr class="rule">
 
                 <div class="salutation">
-                    <div>ለ {winner.bidderName}</div>
+                    <div>ለ {display_name}</div>
                     <div>ባሉበት</div>
                 </div>
 

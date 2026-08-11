@@ -119,6 +119,7 @@ class Winner(models.Model):
     submittedAt = models.DateTimeField(null=True, blank=True)
     initialPrice = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True)
     createdAt = models.DateTimeField(auto_now_add=True)
+    bidderNameAmharic = models.CharField(max_length=255, blank=True, default='')
 
     def __str__(self):
         return f"{self.bidderName} - {self.winningAmount}"

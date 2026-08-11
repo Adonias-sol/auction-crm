@@ -134,9 +134,10 @@ export default function Operations({ role, token, onOpenDetail }) {
     setShowGenerateModal(true);
   }
 
-  async function confirmGeneratePdf({ percentagesByInvId, auctionRefNumber }) {
+  async function confirmGeneratePdf({ percentagesByInvId, auctionRefNumber, amhNames }) {
     try {
       for (const [invId, pct] of Object.entries(percentagesByInvId)) {
+        const amhName = amhNames[invId] || '';
 
         const response = await fetch(`https://auction-crm-api.onrender.com/api/invoices/${invId}/generate-pdf/`, {
           method: 'POST',
@@ -147,6 +148,7 @@ export default function Operations({ role, token, onOpenDetail }) {
           body: JSON.stringify({
             feePercentage: parseFloat(pct),
             auctionRefNumber: auctionRefNumber || '',
+            bidderNameAmharic: amhName,
           }),
         });
 

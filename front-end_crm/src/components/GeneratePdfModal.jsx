@@ -11,11 +11,25 @@ export default function GeneratePdfModal({ invoices, onConfirm, onClose }) {
   });
 
   const [auctionRefNumber, setAuctionRefNumber] = useState('');
+  const [amhNames, setAmhNames] = useState(() => {
+    const init = {};
+    invoices.forEach((inv) => { init[inv.id] = inv.bidderNameAmharic || ""; });
+    return init;
+  });
+
   function setPct(invId, value) {
     setPcts(prev => ({ ...prev, [invId]: value }));
 
   }
+  function setAmhName(invId, value) {
+    setAmhNames(prev => ({ ...prev, [invId]: value }));
+  }
   function handleConfirm() {
+    const missingName = invoices.some((inv) => !(amhNames[inv.id] || "").trim());
+    if (missingName) {
+      window.alert("Enter the bidder name in Amharic for every invoice before generating.");
+      return;
+    }
     const percentagesByInvId = {};
     invoices.forEach(inv => {
       percentagesByInvId[inv.id] = pcts[inv.id] || '0.95';
@@ -23,6 +37,7 @@ export default function GeneratePdfModal({ invoices, onConfirm, onClose }) {
     const dataToSend = {
       percentagesByInvId,
       auctionRefNumber,
+      amhNames,
     };
     onConfirm(dataToSend);
     onClose();
@@ -44,12 +59,21 @@ export default function GeneratePdfModal({ invoices, onConfirm, onClose }) {
         <div className="modal-body">
           <div className="tbl-wrap" style={{ marginBottom: 16 }}>
             <table>
-              <thead><tr><th>Invoice #</th><th>Bidder</th><th>Fee %</th></tr></thead>
+              <thead><tr><th>Invoice #</th><th>Bidder</th><th>Bidder (Amharic)</th><th>Fee %</th></tr></thead>
               <tbody>
                 {invoices.map((inv) => (
                   <tr key={inv.id}>
                     <td className="mono">{inv.invoiceNumber}</td>
                     <td>{inv.bidderName}</td>
+                    <td>
+                      <input
+                        type="text"
+                        placeholder="የተጫራች ስም"
+                        value={amhNames[inv.id] || ''}
+                        onChange={(e) => setAmhName(inv.id, e.target.value)}
+                        style={{ width: 140, fontSize: 13, padding: "5px 8px", border: "1px solid var(--border)", borderRadius: 5 }}
+                      />
+                    </td>
                     <td>
                       <input
                         type="number" step="0.01" min="0" max="100"

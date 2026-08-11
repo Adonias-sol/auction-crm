@@ -1,4 +1,5 @@
 FROM python:3.12-slim
+ENV PYTHONUNBUFFERED=1
 
 RUN apt-get update && apt-get install -y \
     libpango-1.0-0 \
@@ -19,4 +20,4 @@ COPY . .
 
 RUN python manage.py collectstatic --noinput
 
-CMD ["gunicorn", "auction_crm.wsgi:application", "--bind", "0.0.0.0:10000"]
+CMD sh -c "echo '=== RUNNING MIGRATIONS ===' && python manage.py migrate --noinput && echo '=== MIGRATIONS DONE ===' && gunicorn auction_crm.wsgi:application --bind 0.0.0.0:10000"

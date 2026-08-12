@@ -57,15 +57,10 @@ class ReportPreviewView(APIView):
         })
 
 
+import logging
+logger = logging.getLogger(__name__)
+
 class ReportGeneratePdfView(APIView):
-    """
-    POST /api/reports/generate-pdf/ — re-runs the SAME query fresh (not
-    reusing whatever the browser had in the preview), renders a PDF, saves
-    a GeneratedReport row for the "Recently generated" list, and returns
-    the file for download. Re-running fresh matters if time has passed
-    since the preview — the report should reflect right now, not a stale
-    screen state.
-    """
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
@@ -77,24 +72,30 @@ class ReportGeneratePdfView(APIView):
         try:
             title, period_label, columns, rows, total = run_report(report_type, filters)
         except Exception as e:
+            logger.exception("run_report failed")
             return Response({'error': str(e)}, status=http_status.HTTP_400_BAD_REQUEST)
 
-        from weasyprint import HTML  # imported here, not module-level — same Windows-local-dev reason as invoice PDFs
-        html_string = self._render_report_html(title, period_label, columns, rows, total)
-        pdf_bytes = HTML(string=html_string).write_pdf()
+        try:
+            from weasyprint import HTML
+            html_string = self._render_report_html(title, period_label, columns, rows, total)
+            pdf_bytes = HTML(string=html_string).write_pdf()
 
-        report = GeneratedReport(
-            reportType=report_type, title=title, periodLabel=period_label,
-            filters=filters, rowCount=len(rows), totalAmount=total,
-            generatedBy=request.user if request.user.is_authenticated else None,
-        )
-        report.file.save(f"{report_type}-{report.generatedAt or 'report'}.pdf".replace(' ', '_'),
-                          ContentFile(pdf_bytes), save=False)
-        report.save()
+            from django.utils import timezone
+            report = GeneratedReport(
+                reportType=report_type, title=title, periodLabel=period_label,
+                filters=filters, rowCount=len(rows), totalAmount=total,
+                generatedBy=request.user if request.user.is_authenticated else None,
+            )
+            fname = f"{report_type}-{timezone.now():%Y%m%d%H%M%S}.pdf"
+            report.file.save(fname, ContentFile(pdf_bytes), save=False)
+            report.save()
 
-        from django.http import FileResponse
-        return FileResponse(BytesIO(pdf_bytes), as_attachment=True,
-                             filename=f"{title.replace(' ', '_')}.pdf", content_type='application/pdf')
+            from django.http import FileResponse
+            return FileResponse(BytesIO(pdf_bytes), as_attachment=True,
+                                 filename=f"{title.replace(' ', '_')}.pdf", content_type='application/pdf')
+        except Exception as e:
+            logger.exception("PDF generation/save failed")
+            return Response({'error': f'PDF generation failed: {e}'}, status=http_status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     @staticmethod
     def _render_report_html(title, period_label, columns, rows, total):

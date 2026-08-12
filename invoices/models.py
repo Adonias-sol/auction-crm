@@ -274,3 +274,25 @@ class AuditLog(models.Model):
 
     def __str__(self):
         return f"{self.invoice.invoiceNumber}: {self.action}"
+
+# Add this class to the bottom of your existing models.py — nothing else
+# in that file changes. Then: python manage.py makemigrations && migrate
+
+class GeneratedReport(models.Model):
+    """
+    One row per PDF actually generated from the Reports page — backs the
+    "Recently generated" list. Preview alone (screen-only) does NOT create
+    one of these; only clicking "Generate PDF" does.
+    """
+    reportType = models.CharField(max_length=30)
+    title = models.CharField(max_length=200)
+    periodLabel = models.CharField(max_length=100, blank=True)
+    filters = models.JSONField(default=dict, blank=True)
+    rowCount = models.IntegerField(default=0)
+    totalAmount = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True)
+    file = models.FileField(upload_to='reports/%Y/%m/')
+    generatedBy = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
+    generatedAt = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.title} — {self.generatedAt:%Y-%m-%d %H:%M}"

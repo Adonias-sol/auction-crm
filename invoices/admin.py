@@ -3,7 +3,7 @@ from django.db.models import Sum
 
 from .models import (
     StaffProfile, Auction, Winner, ImportBatch, FeeConfig,
-    Invoice, InvoiceLot, Payment, Attachment, AuditLog,
+    Invoice, InvoiceLot, Payment, Attachment, AuditLog,GeneratedReport,
 )
 
 
@@ -127,3 +127,10 @@ class AuditLogAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+# Add to admin.py
+
+@admin.register(GeneratedReport)
+class GeneratedReportAdmin(admin.ModelAdmin):
+    list_display = ('title', 'periodLabel', 'rowCount', 'totalAmount', 'generatedBy', 'generatedAt')
+    list_filter = ('reportType',)
+    readonly_fields = ('generatedAt',)

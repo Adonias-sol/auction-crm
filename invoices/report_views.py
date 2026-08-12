@@ -122,7 +122,37 @@ class ReportGeneratePdfView(APIView):
         </body></html>
         """
 
+class FilterOptionsView(APIView):
+    """GET /api/reports/filter-options/ — populates the Client/Company and
+    Import Batch dropdowns with real values pulled from actual invoices,
+    instead of making users guess/type them freehand."""
+    permission_classes = [IsAuthenticated]
 
+    def get(self, request):
+        from .models import Winner, ImportBatch, Invoice
+
+        companies = (
+            Winner.objects.filter(invoices__isnull=False)
+            .exclude(companyName='')
+            .values_list('companyName', flat=True)
+            .distinct()
+            .order_by('companyName')
+        )
+
+        batches = (
+            ImportBatch.objects.filter(invoices__isnull=False)
+            .distinct()
+            .order_by('-uploadDate')
+        )
+
+        return Response({
+            'companies': list(companies),
+            'importBatches': [
+                {'id': b.id, 'label': b.batchName or b.fileName}
+                for b in batches
+            ],
+            'paymentStatuses': [{'value': v, 'label': l} for v, l in Invoice.STATUS_CHOICES],
+        })
 class RecentReportsView(APIView):
     """GET /api/reports/recent/ — backs the 'Recently generated' list."""
     permission_classes = [IsAuthenticated]

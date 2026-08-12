@@ -57,7 +57,6 @@ export default function Reports({ role, token }) {
 
   useEffect(() => { fetchRecent(); fetchOptions(); }, []);
 
-  // Persist the in-progress filter draft so switching tabs doesn't wipe it.
   useEffect(() => {
     try {
       sessionStorage.setItem(FILTERS_KEY, JSON.stringify(filters));
@@ -203,27 +202,27 @@ export default function Reports({ role, token }) {
           <div className="field-grid">
             <div className="field">
               <div className="fl">Report type</div>
-              <select value={filters.reportType} onChange={(e) => setF("reportType", e.target.value)}>
+              <select style={{ width: "100%" }} value={filters.reportType} onChange={(e) => setF("reportType", e.target.value)}>
                 {REPORT_TYPE_OPTIONS.map((o) => <option key={o.v} value={o.v}>{o.l}</option>)}
               </select>
             </div>
             <div className="field">
               <div className="fl">Period</div>
-              <select value={filters.period} onChange={(e) => setF("period", e.target.value)}>
+              <select style={{ width: "100%" }} value={filters.period} onChange={(e) => setF("period", e.target.value)}>
                 {PERIOD_OPTIONS.map((o) => <option key={o.v} value={o.v}>{o.l}</option>)}
               </select>
             </div>
 
             <div className="field">
               <div className="fl">Client / company <span className="opt">(optional)</span></div>
-              <select value={filters.clientCompany} onChange={(e) => setF("clientCompany", e.target.value)}>
+              <select style={{ width: "100%" }} value={filters.clientCompany} onChange={(e) => setF("clientCompany", e.target.value)}>
                 <option value="">Any client</option>
                 {options.companies.map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
             <div className="field">
               <div className="fl">Import batch <span className="opt">(optional)</span></div>
-              <select value={filters.importBatch} onChange={(e) => setF("importBatch", e.target.value)}>
+              <select style={{ width: "100%" }} value={filters.importBatch} onChange={(e) => setF("importBatch", e.target.value)}>
                 <option value="">Any batch</option>
                 {options.importBatches.map((b) => <option key={b.id} value={b.id}>{b.label}</option>)}
               </select>
@@ -231,16 +230,17 @@ export default function Reports({ role, token }) {
 
             <div className="field">
               <div className="fl">Date from <span className="opt">(optional)</span></div>
-              <input type="date" value={filters.dateFrom} onChange={(e) => setF("dateFrom", e.target.value)} />
+              <input style={{ width: "100%" }} type="date" value={filters.dateFrom} onChange={(e) => setF("dateFrom", e.target.value)} />
             </div>
             <div className="field">
               <div className="fl">Date to <span className="opt">(optional)</span></div>
-              <input type="date" value={filters.dateTo} onChange={(e) => setF("dateTo", e.target.value)} />
+              <input style={{ width: "100%" }} type="date" value={filters.dateTo} onChange={(e) => setF("dateTo", e.target.value)} />
             </div>
 
             <div className="field" style={{ gridColumn: "1 / -1" }}>
               <div className="fl">Auction <span className="opt">(optional)</span></div>
               <input
+                style={{ width: "100%" }}
                 placeholder="e.g. Spring Classic Cars"
                 value={filters.auction}
                 onChange={(e) => setF("auction", e.target.value)}
@@ -249,10 +249,10 @@ export default function Reports({ role, token }) {
           </div>
 
           <div style={{ marginBottom: 18 }}>
-            <div className="fl" style={{ marginBottom: 8 }}>
-              Payment status <span className="opt">(optional — pick as many as you like)</span>
+            <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text)", marginBottom: 10 }}>
+              Payment status <span className="opt" style={{ fontWeight: 400 }}>(optional — pick as many as you like)</span>
             </div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "10px 20px" }}>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "10px 24px" }}>
               {(options.paymentStatuses.length > 0
                 ? options.paymentStatuses
                 : Object.entries(STATUS_LABELS).map(([value, label]) => ({ value, label }))
@@ -269,7 +269,7 @@ export default function Reports({ role, token }) {
             </div>
           </div>
 
-          <button className="btn btn-brass" onClick={runPreview} disabled={loading}>
+          <button className="btn btn-primary" onClick={runPreview} disabled={loading}>
             {loading ? "Loading..." : "Preview report"}
           </button>
           {error && <div style={{ color: "var(--red)", marginTop: 10, fontSize: 13 }}>{error}</div>}

@@ -186,7 +186,7 @@ class ReportGeneratePdfView(APIView):
         </style></head><body>
             {watermark_html}
             <div class="header-row">
-                {logo_html}
+                <div>{logo_html}<div>
                 <div class="brand">Auction Ethiopia — Processing Fee Management</div>
             </div>
             <div class="header-bar"></div>

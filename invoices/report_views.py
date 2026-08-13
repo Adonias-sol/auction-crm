@@ -172,10 +172,10 @@ class ReportGeneratePdfView(APIView):
                 z-index: -1;
                 width: 900px;
             }}
-            .header-row {{ display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }}
-            .logo {{ height: 42px; width: auto; }}
+            .header-row {{ margin-bottom: 10px; }}
+            .logo {{ height: 42px; width: auto; display: block; margin-bottom: 6px; }}
             .brand {{ font-size: 13px; font-weight: 600; color: #63675F; text-transform: uppercase; letter-spacing: 0.04em; }}
-            .header-bar {{ background: #AD7F27; height: 6px; margin-bottom: 18px; }}
+            .header-bar {{ background: #AD7F27; height: 6px; width: 100%; margin-bottom: 18px; }}
             h1 {{ font-size: 20px; margin: 0 0 2px; color: #14171C; }}
             .meta {{ color: #63675F; margin-bottom: 18px; font-size: 12px; }}
             table {{ width: 100%; border-collapse: collapse; }}
@@ -186,7 +186,7 @@ class ReportGeneratePdfView(APIView):
         </style></head><body>
             {watermark_html}
             <div class="header-row">
-                <div>{logo_html}<div>
+                {logo_html}
                 <div class="brand">Auction Ethiopia — Processing Fee Management</div>
             </div>
             <div class="header-bar"></div>

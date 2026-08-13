@@ -16,6 +16,19 @@ REPORT_TITLES = {
     'overdue': 'Overdue payments report', 'by-auction': 'Revenue by auction',
     'by-client': 'Revenue by client',
 }
+STATUS_DISPLAY = {
+    'invoice_generated': 'Invoice Generated',
+    'pending_payment': 'Pending Payment',
+    'payment_submitted': 'Payment Submitted',
+    'under_verification': 'Under Verification',
+    'paid': 'Paid',
+    'overdue': 'Overdue',
+    'cancelled': 'Cancelled',
+    'waived': 'Waived',
+    'verified': 'Verified',
+    'rejected': 'Rejected',
+    'pending': 'Pending',
+        }
 
 
 def _parse_filters(data):
@@ -97,19 +110,7 @@ class ReportGeneratePdfView(APIView):
             logger.exception("PDF generation/save failed")
             return Response({'error': f'PDF generation failed: {e}'}, status=http_status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    STATUS_DISPLAY = {
-    'invoice_generated': 'Invoice Generated',
-    'pending_payment': 'Pending Payment',
-    'payment_submitted': 'Payment Submitted',
-    'under_verification': 'Under Verification',
-    'paid': 'Paid',
-    'overdue': 'Overdue',
-    'cancelled': 'Cancelled',
-    'waived': 'Waived',
-    'verified': 'Verified',
-    'rejected': 'Rejected',
-    'pending': 'Pending',
-        }
+    
 
     @staticmethod
     def _render_report_html(title, period_label, columns, rows, total):

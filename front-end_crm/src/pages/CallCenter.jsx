@@ -85,15 +85,22 @@ export default function CallCenter({ role, token }) {
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 16, flexWrap: "wrap" }}>
-        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={{ maxWidth: 220 }}>
-          {statusFilters.map((s) => (
-            <option key={s.value} value={s.value}>{s.label}</option>
-          ))}
-        </select>
-        <div style={{ fontSize: 13, color: "var(--text-2)" }}>
-          {loading ? "Loading..." : `${rows.length} to contact`}
+        <div className="field" style={{ maxWidth: 240 }}>
+            <select
+                className="select-standalone"
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                style={{ maxWidth: 240 }}
+                >
+                {statusFilters.map((s) => (
+                    <option key={s.value} value={s.value}>{s.label}</option>
+                ))}
+            </select>
         </div>
-      </div>
+        <div style={{ fontSize: 13, color: "var(--text-2)" }}>
+            {loading ? "Loading..." : `${rows.length} to contact`}
+        </div>
+        </div>
 
       {error && <div style={{ color: "var(--red)", marginBottom: 12, fontSize: 13 }}>{error}</div>}
 

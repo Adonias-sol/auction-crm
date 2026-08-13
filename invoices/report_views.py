@@ -97,24 +97,56 @@ class ReportGeneratePdfView(APIView):
             logger.exception("PDF generation/save failed")
             return Response({'error': f'PDF generation failed: {e}'}, status=http_status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+    STATUS_DISPLAY = {
+    'invoice_generated': 'Invoice Generated',
+    'pending_payment': 'Pending Payment',
+    'payment_submitted': 'Payment Submitted',
+    'under_verification': 'Under Verification',
+    'paid': 'Paid',
+    'overdue': 'Overdue',
+    'cancelled': 'Cancelled',
+    'waived': 'Waived',
+    'verified': 'Verified',
+    'rejected': 'Rejected',
+    'pending': 'Pending',
+        }
+
     @staticmethod
     def _render_report_html(title, period_label, columns, rows, total):
         head = ''.join(f"<th>{c['label']}</th>" for c in columns)
+
+        def fmt_cell(row, col):
+            key = col['key']
+            val = row.get(key, '')
+            if key in ('status', 'result') and val in STATUS_DISPLAY:
+                return STATUS_DISPLAY[val]
+            if key == 'amount':
+                try:
+                    return f"ETB {Decimal(val):,.2f}"
+                except Exception:
+                    return val
+            return val
+
         body = ''.join(
-            '<tr>' + ''.join(f"<td>{r.get(c['key'], '')}</td>" for c in columns) + '</tr>'
+            '<tr>' + ''.join(f"<td>{fmt_cell(r, c)}</td>" for c in columns) + '</tr>'
             for r in rows
         )
         return f"""
         <!DOCTYPE html><html><head><meta charset="UTF-8"><style>
             @page {{ size: A4; margin: 30px; }}
-            body {{ font-family: sans-serif; font-size: 12px; }}
-            h1 {{ font-size: 18px; margin-bottom: 2px; }}
-            .meta {{ color: #666; margin-bottom: 16px; }}
+            body {{ font-family: sans-serif; font-size: 12px; color: #1B1D1F; }}
+            .header-bar {{ background: #AD7F27; height: 6px; margin-bottom: 18px; }}
+            .brand {{ font-size: 13px; font-weight: 600; color: #63675F; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.04em; }}
+            h1 {{ font-size: 20px; margin: 0 0 2px; color: #14171C; }}
+            .meta {{ color: #63675F; margin-bottom: 18px; font-size: 12px; }}
             table {{ width: 100%; border-collapse: collapse; }}
-            th, td {{ text-align: left; padding: 6px 8px; border-bottom: 1px solid #ddd; }}
-            th {{ background: #f3f3f3; }}
-            .total {{ margin-top: 12px; font-weight: bold; text-align: right; }}
+            th {{ text-align: left; padding: 8px 10px; border-bottom: 2px solid #AD7F27; background: #F4EBD6; color: #1B1D1F; font-size: 11px; text-transform: uppercase; letter-spacing: 0.03em; }}
+            td {{ text-align: left; padding: 7px 10px; border-bottom: 1px solid #DEE0DA; color: #1B1D1F; }}
+            tr:nth-child(even) td {{ background: #F9F9F7; }}
+            .total {{ margin-top: 14px; font-weight: bold; text-align: right; font-size: 13px; color: #14171C; }}
         </style></head><body>
+            <div class="header-bar"></div>
+            <div class="brand">Auction Ethiopia — Processing Fee Management</div>
             <h1>{title}</h1>
             <div class="meta">{period_label} &middot; {len(rows)} record(s)</div>
             <table><thead><tr>{head}</tr></thead><tbody>{body}</tbody></table>

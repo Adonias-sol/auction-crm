@@ -252,16 +252,27 @@ export default function Reports({ role, token }) {
             <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text)", marginBottom: 10 }}>
               Payment status <span className="opt" style={{ fontWeight: 400 }}>(optional — pick as many as you like)</span>
             </div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "10px 24px" }}>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "12px 28px" }}>
               {(options.paymentStatuses.length > 0
                 ? options.paymentStatuses
                 : Object.entries(STATUS_LABELS).map(([value, label]) => ({ value, label }))
               ).map((s) => (
-                <label key={s.value} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13.5, cursor: "pointer" }}>
+                <label
+                  key={s.value}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 7,
+                    fontSize: 13.5,
+                    cursor: "pointer",
+                    whiteSpace: "nowrap",
+                  }}
+                >
                   <input
                     type="checkbox"
                     checked={filters.paymentStatus.includes(s.value)}
                     onChange={() => toggleStatus(s.value)}
+                    style={{ width: 15, height: 15, accentColor: "var(--brass)", flexShrink: 0 }}
                   />
                   {s.label}
                 </label>

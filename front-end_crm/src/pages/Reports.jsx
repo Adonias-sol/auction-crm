@@ -193,36 +193,36 @@ export default function Reports({ role, token }) {
   return (
     <div>
       {showFilters && (
-        <div className="card">
+        <div className="card">  
           <h3 style={{ margin: "0 0 4px" }}>Build a custom report</h3>
           <div style={{ fontSize: 12.5, color: "var(--text-2)", marginBottom: 16 }}>
             Choose a report type and narrow it to a specific period, client, batch, or auction. Preview on screen, then generate a PDF.
           </div>
 
-          <div className="field-grid">
+          <div className="field-grid" style={{ maxWidth: 760 }}>
             <div className="field">
               <div className="fl">Report type</div>
-              <select style={{ width: "100%" }} value={filters.reportType} onChange={(e) => setF("reportType", e.target.value)}>
+              <select value={filters.reportType} onChange={(e) => setF("reportType", e.target.value)}>
                 {REPORT_TYPE_OPTIONS.map((o) => <option key={o.v} value={o.v}>{o.l}</option>)}
               </select>
             </div>
             <div className="field">
               <div className="fl">Period</div>
-              <select style={{ width: "100%" }} value={filters.period} onChange={(e) => setF("period", e.target.value)}>
+              <select value={filters.period} onChange={(e) => setF("period", e.target.value)}>
                 {PERIOD_OPTIONS.map((o) => <option key={o.v} value={o.v}>{o.l}</option>)}
               </select>
             </div>
 
             <div className="field">
               <div className="fl">Client / company <span className="opt">(optional)</span></div>
-              <select style={{ width: "100%" }} value={filters.clientCompany} onChange={(e) => setF("clientCompany", e.target.value)}>
+              <select value={filters.clientCompany} onChange={(e) => setF("clientCompany", e.target.value)}>
                 <option value="">Any client</option>
                 {options.companies.map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
             <div className="field">
               <div className="fl">Import batch <span className="opt">(optional)</span></div>
-              <select style={{ width: "100%" }} value={filters.importBatch} onChange={(e) => setF("importBatch", e.target.value)}>
+              <select value={filters.importBatch} onChange={(e) => setF("importBatch", e.target.value)}>
                 <option value="">Any batch</option>
                 {options.importBatches.map((b) => <option key={b.id} value={b.id}>{b.label}</option>)}
               </select>
@@ -230,17 +230,16 @@ export default function Reports({ role, token }) {
 
             <div className="field">
               <div className="fl">Date from <span className="opt">(optional)</span></div>
-              <input style={{ width: "100%" }} type="date" value={filters.dateFrom} onChange={(e) => setF("dateFrom", e.target.value)} />
+              <input type="date" value={filters.dateFrom} onChange={(e) => setF("dateFrom", e.target.value)} />
             </div>
             <div className="field">
               <div className="fl">Date to <span className="opt">(optional)</span></div>
-              <input style={{ width: "100%" }} type="date" value={filters.dateTo} onChange={(e) => setF("dateTo", e.target.value)} />
+              <input type="date" value={filters.dateTo} onChange={(e) => setF("dateTo", e.target.value)} />
             </div>
 
-            <div className="field" style={{ gridColumn: "1 / -1" }}>
+            <div className="field">
               <div className="fl">Auction <span className="opt">(optional)</span></div>
               <input
-                style={{ width: "100%" }}
                 placeholder="e.g. Spring Classic Cars"
                 value={filters.auction}
                 onChange={(e) => setF("auction", e.target.value)}

@@ -41,6 +41,15 @@ def _watermark_data_uri():
         return f"data:image/png;base64,{encoded}"
     except FileNotFoundError:
         return None
+    
+def _logo_data_uri():
+    path = os.path.join(settings.BASE_DIR, 'invoices', 'static', 'logo.png')
+    try:
+        with open(path, 'rb') as f:
+            encoded = base64.b64encode(f.read()).decode('ascii')
+        return f"data:image/png;base64,{encoded}"
+    except FileNotFoundError:
+        return None
 
 def _parse_filters(data):
     """Filters arrive as querystring-ish flat data from either GET params
@@ -147,6 +156,9 @@ class ReportGeneratePdfView(APIView):
         watermark_uri = _watermark_data_uri()
         watermark_html = f'<img class="watermark" src="{watermark_uri}">' if watermark_uri else ''
 
+        logo_uri = _logo_data_uri()
+        logo_html = f'<img class="logo" src="{logo_uri}">' if logo_uri else ''
+
         return f"""
         <!DOCTYPE html><html><head><meta charset="UTF-8"><style>
             @page {{ size: A4; margin: 30px; }}
@@ -160,8 +172,10 @@ class ReportGeneratePdfView(APIView):
                 z-index: -1;
                 width: 900px;
             }}
+            .header-row {{ display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }}
+            .logo {{ height: 42px; width: auto; }}
+            .brand {{ font-size: 13px; font-weight: 600; color: #63675F; text-transform: uppercase; letter-spacing: 0.04em; }}
             .header-bar {{ background: #AD7F27; height: 6px; margin-bottom: 18px; }}
-            .brand {{ font-size: 13px; font-weight: 600; color: #63675F; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.04em; }}
             h1 {{ font-size: 20px; margin: 0 0 2px; color: #14171C; }}
             .meta {{ color: #63675F; margin-bottom: 18px; font-size: 12px; }}
             table {{ width: 100%; border-collapse: collapse; }}
@@ -171,8 +185,11 @@ class ReportGeneratePdfView(APIView):
             .total {{ margin-top: 14px; font-weight: bold; text-align: right; font-size: 13px; color: #14171C; }}
         </style></head><body>
             {watermark_html}
+            <div class="header-row">
+                {logo_html}
+                <div class="brand">Auction Ethiopia — Processing Fee Management</div>
+            </div>
             <div class="header-bar"></div>
-            <div class="brand">Auction Ethiopia — Processing Fee Management</div>
             <h1>{title}</h1>
             <div class="meta">{period_label} &middot; {len(rows)} record(s)</div>
             <table><thead><tr>{head}</tr></thead><tbody>{body}</tbody></table>

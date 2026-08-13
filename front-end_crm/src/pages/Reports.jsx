@@ -199,7 +199,7 @@ export default function Reports({ role, token }) {
             Choose a report type and narrow it to a specific period, client, batch, or auction. Preview on screen, then generate a PDF.
           </div>
 
-          <div className="field-grid" style={{ maxWidth: 760 }}>
+          <div className="field-grid">
             <div className="field">
               <div className="fl">Report type</div>
               <select value={filters.reportType} onChange={(e) => setF("reportType", e.target.value)}>
@@ -237,7 +237,7 @@ export default function Reports({ role, token }) {
               <input type="date" value={filters.dateTo} onChange={(e) => setF("dateTo", e.target.value)} />
             </div>
 
-            <div className="field">
+            <div className="field" style={{ gridColumn: "1 / -1" }}>
               <div className="fl">Auction <span className="opt">(optional)</span></div>
               <input
                 placeholder="e.g. Spring Classic Cars"

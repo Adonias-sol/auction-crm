@@ -29,7 +29,18 @@ STATUS_DISPLAY = {
     'rejected': 'Rejected',
     'pending': 'Pending',
         }
+import base64
+import os
+from django.conf import settings
 
+def _watermark_data_uri():
+    path = os.path.join(settings.BASE_DIR, 'invoices', 'static', 'watermark.png')
+    try:
+        with open(path, 'rb') as f:
+            encoded = base64.b64encode(f.read()).decode('ascii')
+        return f"data:image/png;base64,{encoded}"
+    except FileNotFoundError:
+        return None
 
 def _parse_filters(data):
     """Filters arrive as querystring-ish flat data from either GET params
@@ -132,10 +143,23 @@ class ReportGeneratePdfView(APIView):
             '<tr>' + ''.join(f"<td>{fmt_cell(r, c)}</td>" for c in columns) + '</tr>'
             for r in rows
         )
+
+        watermark_uri = _watermark_data_uri()
+        watermark_html = f'<img class="watermark" src="{watermark_uri}">' if watermark_uri else ''
+
         return f"""
         <!DOCTYPE html><html><head><meta charset="UTF-8"><style>
             @page {{ size: A4; margin: 30px; }}
             body {{ font-family: sans-serif; font-size: 12px; color: #1B1D1F; }}
+            .watermark {{
+                position: fixed;
+                left: 25%;
+                top: 50%;
+                transform: translate(-50%, -25%);
+                opacity: 0.3;
+                z-index: -1;
+                width: 900px;
+            }}
             .header-bar {{ background: #AD7F27; height: 6px; margin-bottom: 18px; }}
             .brand {{ font-size: 13px; font-weight: 600; color: #63675F; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.04em; }}
             h1 {{ font-size: 20px; margin: 0 0 2px; color: #14171C; }}
@@ -146,6 +170,7 @@ class ReportGeneratePdfView(APIView):
             tr:nth-child(even) td {{ background: #F9F9F7; }}
             .total {{ margin-top: 14px; font-weight: bold; text-align: right; font-size: 13px; color: #14171C; }}
         </style></head><body>
+            {watermark_html}
             <div class="header-bar"></div>
             <div class="brand">Auction Ethiopia — Processing Fee Management</div>
             <h1>{title}</h1>

@@ -13,7 +13,7 @@ import Operations from "./pages/Operations";
 import Queues from "./pages/Queues";
 import Reports from "./pages/Reports";
 import AuditTrail from "./pages/AuditTrail";
-
+import CallCenter from "./pages/CallCenter";
 export default function App() {
   const [page, setPage] = useState("dashboard");
   const [session, setSession] = useState(() => {
@@ -123,6 +123,7 @@ export default function App() {
             )}
           {page === "queues" && <Queues token={session.token} />}
           {page === "reports" && <Reports role={session.role} token={session.token} />}
+          {page === "callcenter" && <CallCenter role={session.role} token={session.token} />} 
           {page === "audit" && <AuditTrail token={session.token} />}
         </div>  
       </div>

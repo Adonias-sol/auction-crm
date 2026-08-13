@@ -30,6 +30,7 @@ export const navItems = [
   { key: "operations", label: "Operations", sub: "" },
   { key: "queues", label: "Operational queues", sub: "" },
   { key: "reports", label: "Reports", sub: "" },
+  { key: "callcenter", label: "Call center" },
   { key: "audit", label: "Audit trail", sub: "" },
 ];
 

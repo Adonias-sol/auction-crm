@@ -153,6 +153,7 @@ class Invoice(models.Model):
     dueDate = models.DateField()
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='invoice_generated')
     remarks = models.TextField(blank=True, default='')
+    callNotes = models.TextField(blank=True, default='', help_text="Call Center follow-up note — single mutable field, not a history log.")
     createdAt = models.DateTimeField(auto_now_add=True)
     updatedAt = models.DateTimeField(auto_now=True)
 

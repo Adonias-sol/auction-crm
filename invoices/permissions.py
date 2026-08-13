@@ -14,6 +14,7 @@ ROLE_PERMISSIONS = {
     'change_status_generic': ['administrator', 'finance_manager'],   # her canChangeStatus() — the click-to-edit status badge, and the shared endpoint behind Verify/Reject/Mark paid/Mark overdue
     'extend_due_date':       ['administrator'],
     'add_remarks':           ['administrator', 'auction_manager', 'finance_manager', 'call_operator'],
+    'manage_call_center': ['administrator', 'call_operator'],
     'view_dashboard':        ['administrator', 'auction_manager', 'finance_manager', 'viewer'],
     'view_reports':          ['administrator', 'auction_manager', 'finance_manager', 'viewer'],
     'view_audit':            ['administrator', 'auction_manager', 'finance_manager', 'viewer'],

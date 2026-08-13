@@ -159,8 +159,8 @@ class InvoiceListSerializer(InvoiceWinnerFieldsMixin, serializers.ModelSerialize
             'id', 'invoiceNumber', 'invoiceDate', 'dueDate', 'winner',
             'totalAmount', 'status', 'createdAt', 'updatedAt',
             'bidderName', 'companyName', 'winnerPhone',
+            'callNotes',
         ]
-
 
 # -------------------------------------------------- Invoice (detail view)
 

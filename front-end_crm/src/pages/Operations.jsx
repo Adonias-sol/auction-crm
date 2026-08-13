@@ -239,7 +239,21 @@ export default function Operations({ role, token, onOpenDetail }) {
                   <td>
                     {canGeneratePdf && <input type="checkbox" checked={selected.includes(inv.id)} onChange={() => toggleRow(inv.id)} />}
                   </td>
-                  <td className="mono" style={{ cursor: "pointer" }} onClick={() => onOpenDetail(inv.id)}>{inv.invoiceNumber}</td>
+                  <td className="mono">
+                    <span style={{ cursor: "pointer" }} onClick={() => onOpenDetail(inv.id)}>{inv.invoiceNumber}</span>
+                    {inv.callNotes && (
+                      <span
+                        title="Has call center notes"
+                        style={{ marginLeft: 6, cursor: "pointer" }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          alert(`Call center notes for ${inv.invoiceNumber}:\n\n${inv.callNotes}`);
+                        }}
+                      >
+                        📎
+                      </span>
+                    )}
+                  </td>
                   <td>{inv.bidderName}</td>
                   <td>{inv.companyName || <span style={{ color: "var(--text-3)" }}>—</span>}</td>
                   <td className="mono">{inv.lots?.length || 0}</td>

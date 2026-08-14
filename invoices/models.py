@@ -4,30 +4,34 @@ from django.db.models import Sum
 from decimal import Decimal
 
 # Create your models here.
-
-class StaffProfile(models.Model):
+class Role(models.Model):
     """
-    Extends Django's built-in User with a CRM role. One-to-one, same idea as
-    a C# "UserProfile : ApplicationUser" pattern — auth (login/password) stays
-    on the built-in User model, this just tacks on the extra column.
-    Role slugs match the partner's frontend exactly (her code is source of
-    truth per your instruction) — NOT the admin/project_manager/operator
-    slugs from the earlier draft.
+    Database-backed role. Built-in rows (Administrator, Auction Manager,
+    Finance Manager, CRM/Call Center Officer, Viewer) are seeded via data
+    migration and marked isBuiltIn=True — they can still be edited, just
+    not deleted, to protect the 5 the frontend/permissions checks assume
+    exist as sane defaults. Custom roles created via "New role" have
+    isBuiltIn=False.
     """
-    ROLE_CHOICES = [
-        ('administrator', 'Administrator'),
-        ('auction_manager', 'Auction Manager'),
-        ('finance_manager', 'Finance Manager'),
-        ('call_operator', 'CRM / Call Center Officer'),
-        ('viewer', 'Viewer'),
-    ]
-
-    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='profile')
-    role = models.CharField(max_length=20, choices=ROLE_CHOICES)
+    name = models.CharField(max_length=100, unique=True)
+    defaultPrivileges = models.JSONField(default=list, blank=True)
+    isBuiltIn = models.BooleanField(default=False)
+    createdAt = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.user.get_username()} ({self.role})"
+        return self.name
 
+
+class StaffProfile(models.Model):
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='profile')
+    role = models.ForeignKey(Role, on_delete=models.PROTECT, related_name='staff')
+    privileges = models.JSONField(default=list, blank=True)
+    isActive = models.BooleanField(default=True)
+    lastPasswordChange = models.DateTimeField(null=True, blank=True)
+    lastUsernameChange = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.user.get_username()} ({self.role.name})"
 
 class ImportBatch(models.Model):
 
@@ -297,3 +301,6 @@ class GeneratedReport(models.Model):
 
     def __str__(self):
         return f"{self.title} — {self.generatedAt:%Y-%m-%d %H:%M}"
+
+
+

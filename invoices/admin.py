@@ -6,6 +6,23 @@ from .models import (
     Invoice, InvoiceLot, Payment, Attachment, AuditLog,GeneratedReport,
 )
 
+@admin.register(Role)
+class RoleAdmin(admin.ModelAdmin):
+    list_display = ('name', 'privilege_count', 'isBuiltIn', 'createdAt')
+    list_filter = ('isBuiltIn',)
+    search_fields = ('name',)
+    readonly_fields = ('createdAt',)
+
+    def privilege_count(self, obj):
+        return len(obj.defaultPrivileges)
+    privilege_count.short_description = 'Privileges'
+
+
+@admin.register(StaffProfile)
+class StaffProfileAdmin(admin.ModelAdmin):
+    list_display = ('user', 'role', 'isActive', 'lastPasswordChange', 'lastUsernameChange')
+    list_filter = ('role', 'isActive')
+    search_fields = ('user__username', 'user__email')
 
 @admin.register(StaffProfile)
 class StaffProfileAdmin(admin.ModelAdmin):

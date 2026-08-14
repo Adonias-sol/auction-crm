@@ -14,6 +14,7 @@ import Queues from "./pages/Queues";
 import Reports from "./pages/Reports";
 import AuditTrail from "./pages/AuditTrail";
 import CallCenter from "./pages/CallCenter";
+import Employees from "./pages/Employees";
 export default function App() {
   const [page, setPage] = useState("dashboard");
   const [session, setSession] = useState(() => {
@@ -125,6 +126,7 @@ export default function App() {
           {page === "reports" && <Reports role={session.role} token={session.token} />}
           {page === "callcenter" && <CallCenter role={session.role} token={session.token} />} 
           {page === "audit" && <AuditTrail token={session.token} />}
+          {page === "employees" && <Employees role={session.role} token={session.token} />}
         </div>  
       </div>
       <InvoiceDetailModal

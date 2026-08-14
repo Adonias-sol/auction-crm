@@ -29,15 +29,13 @@ from .permissions import ReadOnlyForViewer, ActionPermissionMap, can_transition,
 
 
 def log_audit(invoice, action_label, user, previous_value='', new_value='', reason=''):
-    """
-    One place that writes AuditLog rows, so every view stays consistent
-    with what admin.py already enforces (read-only, code-created only).
-    """
+    profile = getattr(user, 'profile', None)
+    role_name = profile.role.name if profile and profile.role else ''
     AuditLog.objects.create(
         invoice=invoice,
         action=action_label,
         performedBy=user if user and user.is_authenticated else None,
-        userRole=getattr(getattr(user, 'profile', None), 'role', ''),
+        userRole=role_name,
         previousValue=str(previous_value),
         newValue=str(new_value),
         reason=reason,
@@ -163,9 +161,6 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         Body: {feePercentage, auctionRefNumber}
         """
         invoice = self.get_object()
-
-        if request.user.profile.role not in ['finance_manager', 'auction_manager', 'administrator']:
-            return Response({'detail': 'Not allowed'}, status=status.HTTP_403_FORBIDDEN)
 
         fee_percentage = request.data.get('feePercentage')
         auction_ref_number = request.data.get('auctionRefNumber', '')\

@@ -9,6 +9,7 @@ from rest_framework import status as http_status
 
 from .models import GeneratedReport
 from .report_queries import run_report
+from .permissions import has_permission
 
 REPORT_TITLES = {
     'outstanding': 'Outstanding processing fees', 'daily': 'Daily collections',
@@ -74,6 +75,8 @@ class ReportPreviewView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
+        if not has_permission(request.user, 'view_reports'):
+            return Response({'error': 'You do not have permission to view reports.'}, status=http_status.HTTP_403_FORBIDDEN)
         report_type = request.data.get('reportType')
         if report_type not in REPORT_TITLES:
             return Response({'error': f'Unknown reportType: {report_type}'}, status=http_status.HTTP_400_BAD_REQUEST)
@@ -97,6 +100,8 @@ class ReportGeneratePdfView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
+        if not has_permission(request.user, 'view_reports'):
+            return Response({'error': 'You do not have permission to generate reports.'}, status=http_status.HTTP_403_FORBIDDEN)
         report_type = request.data.get('reportType')
         if report_type not in REPORT_TITLES:
             return Response({'error': f'Unknown reportType: {report_type}'}, status=http_status.HTTP_400_BAD_REQUEST)

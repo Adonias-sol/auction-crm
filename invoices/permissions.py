@@ -72,20 +72,13 @@ def can_transition(current_status, new_status, user):
 # ---------------------------------------------------------------------------
 
 class ReadOnlyForViewer(BasePermission):
-    """
-    Blanket safety net for every '👁' in your permission table: a viewer can
-    GET anything they're allowed to view, but can never write — regardless
-    of what any specific action check below says. Put this on every
-    ViewSet so a bug in a narrower permission check can't accidentally let
-    a viewer through on a write.
-    """
     def has_permission(self, request, view):
         if not request.user or not request.user.is_authenticated:
             return False
         if request.method in SAFE_METHODS:
             return True
         profile = getattr(request.user, 'profile', None)
-        return profile is not None and profile.role != 'viewer'
+        return profile is not None and profile.role.name != 'Viewer'
 
 
 class ActionPermissionMap(BasePermission):

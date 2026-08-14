@@ -8,5 +8,5 @@ urlpatterns = [
     path('api/', include('invoices.urls')),
     path('api/', include('invoices.report_urls')),
     path('api/', include('invoices.call_center_urls')),
-    path('api/', include('invoices.employee_urls')),,
+    path('api/', include('invoices.employee_urls')),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

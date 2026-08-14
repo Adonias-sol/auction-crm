@@ -24,13 +24,6 @@ class StaffProfileAdmin(admin.ModelAdmin):
     list_filter = ('role', 'isActive')
     search_fields = ('user__username', 'user__email')
 
-@admin.register(StaffProfile)
-class StaffProfileAdmin(admin.ModelAdmin):
-    list_display = ('user', 'role')
-    list_filter = ('role',)
-    search_fields = ('user__username', 'user__email')
-
-
 @admin.register(Auction)
 class AuctionAdmin(admin.ModelAdmin):
     list_display = ('auctionName', 'seller_name', 'auctionDate', 'status', 'createdAt')

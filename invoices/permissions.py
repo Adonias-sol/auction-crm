@@ -88,37 +88,18 @@ class ActionPermissionMap(BasePermission):
 
         action_permissions = {
             'destroy': 'delete_records',
-            'generate_pdf': 'generate_invoice',   # custom @action name
+            'generate_pdf': 'generate_invoice',
         }
 
     Actions not listed pass through (still gated by ReadOnlyForViewer and
     IsAuthenticated) — only list the ones that need restricting beyond
-    "any logged-in staff member." Same shape as an ASP.NET Core
-    [Authorize(Policy = "...")] attribute, just resolved against
-    ROLE_PERMISSIONS instead of a policy registry.
+    "any logged-in staff member."
     """
-    def has_permission(user, action):
-        """
-        Checks the user's effective privileges JSON list first (the new
-        dynamic system) for any of the 11 catalog keys. Falls back to the
-        original static ROLE_PERMISSIONS dict for actions outside the
-        catalog (mark_paid, extend_due_date, delete_records, etc.), which
-        still key off the role's name mapped back to the old role slugs.
-        """
-        if not user or not getattr(user, 'is_authenticated', False):
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
             return False
-        profile = getattr(user, 'profile', None)
-        if profile is None:
-            return False
-
-        from .privileges import PRIVILEGE_KEYS
-        if action in PRIVILEGE_KEYS:
-            return action in (profile.privileges or [])
-
-        role_slug_map = {
-            'Administrator': 'administrator', 'Auction Manager': 'auction_manager',
-            'Finance Manager': 'finance_manager', 'CRM / Call Center Officer': 'call_operator',
-            'Viewer': 'viewer',
-        }
-        legacy_role = role_slug_map.get(profile.role.name, profile.role.name)
-        return legacy_role in ROLE_PERMISSIONS.get(action, [])
+        action_map = getattr(view, 'action_permissions', {})
+        required_action = action_map.get(getattr(view, 'action', None))
+        if required_action is None:
+            return True
+        return has_permission(request.user, required_action)

@@ -236,3 +236,39 @@ class LoginSerializer(serializers.Serializer):
             'username': user.get_username(),
             'role': user.profile.role,
         }
+from .models import Role
+from .privileges import PRIVILEGE_CATALOG
+
+
+class RoleSerializer(serializers.ModelSerializer):
+    privilegeCount = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Role
+        fields = ['id', 'name', 'defaultPrivileges', 'isBuiltIn', 'privilegeCount']
+
+    def get_privilegeCount(self, obj):
+        return len(obj.defaultPrivileges)
+
+
+class EmployeeSerializer(serializers.ModelSerializer):
+    name = serializers.SerializerMethodField()
+    username = serializers.SerializerMethodField()
+    roleName = serializers.CharField(source='role.name', read_only=True)
+    privilegeCount = serializers.SerializerMethodField()
+
+    class Meta:
+        model = StaffProfile
+        fields = [
+            'id', 'name', 'username', 'role', 'roleName', 'privileges',
+            'privilegeCount', 'isActive', 'lastPasswordChange', 'lastUsernameChange',
+        ]
+
+    def get_name(self, obj):
+        return obj.user.get_full_name() or obj.user.get_username()
+
+    def get_username(self, obj):
+        return obj.user.get_username()
+
+    def get_privilegeCount(self, obj):
+        return f"{len(obj.privileges)}/{len(PRIVILEGE_CATALOG)}"

@@ -234,7 +234,7 @@ class LoginSerializer(serializers.Serializer):
         return {
             'token': token.key,
             'username': user.get_username(),
-            'role': user.profile.role,
+            'role': user.profile.role.name,
         }
 from .models import Role
 from .privileges import PRIVILEGE_CATALOG

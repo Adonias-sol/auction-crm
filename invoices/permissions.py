@@ -98,27 +98,27 @@ class ActionPermissionMap(BasePermission):
     ROLE_PERMISSIONS instead of a policy registry.
     """
     def has_permission(user, action):
-    """
-    Checks the user's effective privileges JSON list first (the new
-    dynamic system) for any of the 11 catalog keys. Falls back to the
-    original static ROLE_PERMISSIONS dict for actions outside the
-    catalog (mark_paid, extend_due_date, delete_records, etc.), which
-    still key off the role's name mapped back to the old role slugs.
-    """
-    if not user or not getattr(user, 'is_authenticated', False):
-        return False
-    profile = getattr(user, 'profile', None)
-    if profile is None:
-        return False
+        """
+        Checks the user's effective privileges JSON list first (the new
+        dynamic system) for any of the 11 catalog keys. Falls back to the
+        original static ROLE_PERMISSIONS dict for actions outside the
+        catalog (mark_paid, extend_due_date, delete_records, etc.), which
+        still key off the role's name mapped back to the old role slugs.
+        """
+        if not user or not getattr(user, 'is_authenticated', False):
+            return False
+        profile = getattr(user, 'profile', None)
+        if profile is None:
+            return False
 
-    from .privileges import PRIVILEGE_KEYS
-    if action in PRIVILEGE_KEYS:
-        return action in (profile.privileges or [])
+        from .privileges import PRIVILEGE_KEYS
+        if action in PRIVILEGE_KEYS:
+            return action in (profile.privileges or [])
 
-    role_slug_map = {
-        'Administrator': 'administrator', 'Auction Manager': 'auction_manager',
-        'Finance Manager': 'finance_manager', 'CRM / Call Center Officer': 'call_operator',
-        'Viewer': 'viewer',
-    }
-    legacy_role = role_slug_map.get(profile.role.name, profile.role.name)
-    return legacy_role in ROLE_PERMISSIONS.get(action, [])
+        role_slug_map = {
+            'Administrator': 'administrator', 'Auction Manager': 'auction_manager',
+            'Finance Manager': 'finance_manager', 'CRM / Call Center Officer': 'call_operator',
+            'Viewer': 'viewer',
+        }
+        legacy_role = role_slug_map.get(profile.role.name, profile.role.name)
+        return legacy_role in ROLE_PERMISSIONS.get(action, [])

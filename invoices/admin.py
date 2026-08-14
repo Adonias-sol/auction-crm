@@ -3,7 +3,7 @@ from django.db.models import Sum
 
 from .models import (
     StaffProfile, Auction, Winner, ImportBatch, FeeConfig,
-    Invoice, InvoiceLot, Payment, Attachment, AuditLog,GeneratedReport,
+    Invoice, InvoiceLot, Payment, Attachment, AuditLog,GeneratedReport,Role,
 )
 
 @admin.register(Role)

@@ -224,21 +224,20 @@ class LoginSerializer(serializers.Serializer):
         data['user'] = user
         return data
 
-    ROLE_NAME_TO_SLUG = {
-        'Administrator': 'administrator',
-        'Auction Manager': 'auction_manager',
-        'Finance Manager': 'finance_manager',
-        'CRM / Call Center Officer': 'call_operator',
-        'Viewer': 'viewer',
-    }
-
     def create(self, validated_data):
         user = validated_data['user']
         from rest_framework.authtoken.models import Token
         token, _ = Token.objects.get_or_create(user=user)
 
         role_name = user.profile.role.name
-        role_slug = ROLE_NAME_TO_SLUG.get(role_name, role_name)
+        role_name_to_slug = {
+            'Administrator': 'administrator',
+            'Auction Manager': 'auction_manager',
+            'Finance Manager': 'finance_manager',
+            'CRM / Call Center Officer': 'call_operator',
+            'Viewer': 'viewer',
+        }
+        role_slug = role_name_to_slug.get(role_name, role_name)
 
         return {
             'token': token.key,

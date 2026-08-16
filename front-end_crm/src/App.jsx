@@ -15,26 +15,37 @@ import Reports from "./pages/Reports";
 import AuditTrail from "./pages/AuditTrail";
 import CallCenter from "./pages/CallCenter";
 import Employees from "./pages/Employees";
+
 export default function App() {
   const [page, setPage] = useState("dashboard");
   const [session, setSession] = useState(() => {
-  const stored = localStorage.getItem("authToken");
-  const user = localStorage.getItem("authUser");
+    const sessionToken = sessionStorage.getItem("authToken");
+    const localToken = localStorage.getItem("authToken");
+    const localUser = localStorage.getItem("authUser");
 
-  if (stored && user) {
-    try {
-      const parsed = JSON.parse(user);
-      return {
-        ...parsed,
-        token: stored,
-      };
-    } catch {
-      return null;
+    // sessionStorage always wins — it reflects the most recent login in
+    // this tab. localStorage is only a fallback for "remember me" across
+    // fresh sessions/reloads when sessionStorage is empty.
+    if (sessionToken && localToken === sessionToken && localUser) {
+      try {
+        const parsed = JSON.parse(localUser);
+        return { ...parsed, token: sessionToken };
+      } catch {
+        return null;
+      }
     }
-  }
 
-  return null;
-});
+    if (localToken && localUser) {
+      try {
+        const parsed = JSON.parse(localUser);
+        return { ...parsed, token: localToken };
+      } catch {
+        return null;
+      }
+    }
+
+    return null;
+  });
   const [theme, setTheme] = useState("light");
   const [showAccountSettings, setShowAccountSettings] = useState(false);
   const [invoices, setInvoices] = useState(invoicesSeed);
@@ -63,26 +74,19 @@ export default function App() {
   }
 
   function handleLogout() {
-  sessionStorage.removeItem("authToken");
-  localStorage.removeItem("authToken");
-  localStorage.removeItem("authUser");
+    sessionStorage.removeItem("authToken");
+    localStorage.removeItem("authToken");
+    localStorage.removeItem("authUser");
 
-  setSession(null);
-  setPage("dashboard");
-  setDetailInvNumber(null);
+    setSession(null);
+    setPage("dashboard");
+    setDetailInvNumber(null);
   }
 
   function handleLogin(role, username, token, remember) {
-  setSession({
-    role,
-    username,
-    token,
-  });
-
-  
-}
-
-  
+    sessionStorage.setItem("authToken", token);
+    setSession({ role, username, token });
+  }
 
   function handleSaveProfile(newUsername) {
     setSession((s) => ({ ...s, username: newUsername }));

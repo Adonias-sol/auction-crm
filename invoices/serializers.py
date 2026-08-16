@@ -224,17 +224,26 @@ class LoginSerializer(serializers.Serializer):
         data['user'] = user
         return data
 
+    ROLE_NAME_TO_SLUG = {
+        'Administrator': 'administrator',
+        'Auction Manager': 'auction_manager',
+        'Finance Manager': 'finance_manager',
+        'CRM / Call Center Officer': 'call_operator',
+        'Viewer': 'viewer',
+    }
+
     def create(self, validated_data):
-        # This method is called by the view after validation passes
         user = validated_data['user']
-        # Get or create the token
         from rest_framework.authtoken.models import Token
         token, _ = Token.objects.get_or_create(user=user)
-        
+
+        role_name = user.profile.role.name
+        role_slug = ROLE_NAME_TO_SLUG.get(role_name, role_name)
+
         return {
             'token': token.key,
             'username': user.get_username(),
-            'role': user.profile.role.name,
+            'role': role_slug,
         }
 from .models import Role
 from .privileges import PRIVILEGE_CATALOG

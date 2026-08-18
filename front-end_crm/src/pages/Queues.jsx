@@ -15,37 +15,6 @@ const queueDefs = [
   { key: "recent", label: "Recently paid", filter: (inv) => inv.status === "paid" },
 ];
 
-function QueueCard({ inv }) {
-  return (
-    <div className="card" style={{ marginBottom: 10, padding: 14 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
-        <div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 3 }}>
-            <span className="mono" style={{ fontWeight: 600 }}>{inv.invoiceNumber}</span>
-            <Stamp status={inv.status} />
-          </div>
-          <div style={{ fontSize: 14, fontWeight: 500 }}>{inv.bidderName}</div>
-          <div style={{ fontSize: 12.5, color: "var(--text-2)" }}>
-            {inv.companyName || <span style={{ color: "var(--text-3)" }}>No company on file</span>}
-          </div>
-        </div>
-        <div style={{ textAlign: "right" }}>
-          <div className="amount" style={{ fontSize: 15 }}>{money(inv.totalAmount.toFixed(2))}</div>
-          <div className="mono" style={{ fontSize: 12, color: "var(--text-2)" }}>
-            Due {new Date(inv.dueDate).toLocaleDateString()}
-          </div>
-        </div>
-      </div>
-      <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid var(--border)", fontSize: 12.5 }}>
-        <span style={{ color: "var(--text-3)", marginRight: 6 }}>Call center note:</span>
-        <span style={{ color: inv.callNotes ? "var(--text)" : "var(--text-3)", fontStyle: inv.callNotes ? "normal" : "italic" }}>
-          {inv.callNotes || "No notes yet"}
-        </span>
-      </div>
-    </div>
-  );
-}
-
 export default function Queues({ role, token }) {
   const [invoices, setInvoices] = useState([]);
   const [active, setActive] = useState("pending");
@@ -110,16 +79,39 @@ export default function Queues({ role, token }) {
         })}
       </div>
       {active === "missing" && <div className="queue-note">Invoices still in "Invoice Generated" status past their due date — no receipt was ever submitted.</div>}
-
-      {rows.length === 0 ? (
-        <div className="card" style={{ textAlign: "center", color: "var(--text-3)", padding: 28 }}>
-          Nothing in this queue right now
+      <div className="tbl-wrap">
+        <div style={{ overflowX: "auto" }}>
+          <table>
+            <thead>
+              <tr>
+                <th>Invoice #</th>
+                <th>Bidder</th>
+                <th>Company</th>
+                <th>Total amount</th>
+                <th>Due date</th>
+                <th>Status</th>
+                <th>Call center note</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.length === 0 && <tr><td colSpan={7} style={{ color: "var(--text-3)", textAlign: "center", padding: 24 }}>Nothing in this queue right now</td></tr>}
+              {rows.map((inv) => (
+                <tr key={inv.id}>
+                  <td className="mono">{inv.invoiceNumber}</td>
+                  <td>{inv.bidderName}</td>
+                  <td>{inv.companyName || <span style={{ color: "var(--text-3)" }}>—</span>}</td>
+                  <td className="amount">{money(inv.totalAmount.toFixed(2))}</td>
+                  <td className="mono">{new Date(inv.dueDate).toLocaleDateString()}</td>
+                  <td><Stamp status={inv.status} /></td>
+                  <td style={{ fontSize: 12.5, color: inv.callNotes ? "var(--text)" : "var(--text-3)", fontStyle: inv.callNotes ? "normal" : "italic", maxWidth: 220 }}>
+                    {inv.callNotes || "No notes yet"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
-      ) : (
-        <div>
-          {rows.map((inv) => <QueueCard key={inv.id} inv={inv} />)}
-        </div>
-      )}
+      </div>
     </div>
   );
 }

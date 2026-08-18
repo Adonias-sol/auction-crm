@@ -86,12 +86,12 @@ export default function Dashboard({ role, token }) {
       <div className="grid grid-4" style={{ marginBottom: 16 }}>
         <div className="card">
           <div className="stat-label">Total fees collected</div>
-          <div className="stat-value up">ETB {money(totalCollected.toFixed(2))}</div>
+          <div className="stat-value up">{money(totalCollected.toFixed(2))}</div>
           <div className="stat-foot">Across {totalInvoices} invoices</div>
         </div>
         <div className="card">
           <div className="stat-label">Outstanding fees</div>
-          <div className="stat-value warn">ETB {money(outstanding.toFixed(2))}</div>
+          <div className="stat-value warn">{money(outstanding.toFixed(2))}</div>
           <div className="stat-foot">{unpaidCount} invoices unpaid</div>
         </div>
         <div className="card">
@@ -99,7 +99,7 @@ export default function Dashboard({ role, token }) {
             <div className="stat-label">Received — {periodLabels[receivedPeriod].toLowerCase()}</div>
             <PeriodDropdown value={receivedPeriod} onChange={setReceivedPeriod} />
           </div>
-          <div className="stat-value">ETB {money(receivedThisPeriod.toFixed(2))}</div>
+          <div className="stat-value">{money(receivedThisPeriod.toFixed(2))}</div>
           <div className="stat-foot">Payments verified in this period</div>
         </div>
         <div className="card">

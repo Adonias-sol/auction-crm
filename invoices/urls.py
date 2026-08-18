@@ -3,12 +3,13 @@ from rest_framework.routers import DefaultRouter
 
 from .views import (
     AuctionViewSet, WinnerViewSet, InvoiceViewSet,
-    AttachmentDeleteView, AuditLogListView, FeeConfigView,LoginView,
+    AttachmentDeleteView, AuditLogListView, AuditLogFilterOptionsView, FeeConfigView,LoginView,
 )
 
 from .import_views import (
     ImportBatchViewSet, ImportBatchPreviewView, ImportBatchConfirmView,
 )
+
 
 router = DefaultRouter()
 router.register(r'auctions', AuctionViewSet, basename='auction')
@@ -24,6 +25,7 @@ urlpatterns = [
 
     path('attachments/<int:pk>/', AttachmentDeleteView.as_view(), name='attachment-delete'),
     path('audit-logs/', AuditLogListView.as_view(), name='audit-log-list'),
+    path('audit-logs/filter-options/', AuditLogFilterOptionsView.as_view(), name='audit-log-filter-options'),
     path('fee-config/', FeeConfigView.as_view(), name='fee-config'),
 
     path('', include(router.urls)),

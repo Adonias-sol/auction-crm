@@ -266,8 +266,17 @@ class AuditLog(models.Model):
     StaffProfile) on purpose: if someone's role changes later, the log
     should still say what role they held *at the time* of the action.
     """
+    ACTION_TYPE_CHOICES = [
+        ('change_status', 'Status changed'),
+        ('generate_invoice_pdf', 'Generate invoice PDF'),
+        ('extend_due_date', 'Extend due date'),
+        ('upload_payment', 'Payment uploaded'),
+        ('add_call_note', 'Call center note updated'),
+        ('other', 'Other'),
+    ]
     invoice = models.ForeignKey(Invoice, on_delete=models.CASCADE, related_name='audit_logs')
     action = models.CharField(max_length=255)
+    actionType = models.CharField(max_length=40, blank=True, default='other', choices=ACTION_TYPE_CHOICES)
     performedBy = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True
     )
@@ -276,6 +285,7 @@ class AuditLog(models.Model):
     newValue = models.CharField(max_length=100, blank=True)
     reason = models.TextField(blank=True)
     actionDate = models.DateTimeField(auto_now_add=True)
+
 
     def __str__(self):
         return f"{self.invoice.invoiceNumber}: {self.action}"

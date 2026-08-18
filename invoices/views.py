@@ -12,6 +12,7 @@ from .pagination import StandardPagination
 from io import BytesIO
 from decimal import Decimal
 
+from .audit import log_audit
 import base64
 import os
 from django.conf import settings
@@ -28,18 +29,7 @@ from .permissions import ReadOnlyForViewer, ActionPermissionMap, can_transition,
 
 
 
-def log_audit(invoice, action_label, user, previous_value='', new_value='', reason=''):
-    profile = getattr(user, 'profile', None)
-    role_name = profile.role.name if profile and profile.role else ''
-    AuditLog.objects.create(
-        invoice=invoice,
-        action=action_label,
-        performedBy=user if user and user.is_authenticated else None,
-        userRole=role_name,
-        previousValue=str(previous_value),
-        newValue=str(new_value),
-        reason=reason,
-    )
+
 def _join_amharic_list(items):
         """'A' / 'A እና B' / 'A, B እና C' — Amharic-style list joining."""
         items = [str(i) for i in items]
@@ -180,7 +170,7 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             previous = invoice.status
             invoice.status = 'pending_payment'
             invoice.save(update_fields=['status', 'updatedAt'])
-            log_audit(invoice, 'Generate invoice PDF', request.user, previous, invoice.status)
+            log_audit(invoice, 'Generate invoice PDF', request.user, previous, invoice.status, action_type='generate_invoice_pdf')
 
         images = {}
         static_dir = os.path.join(settings.BASE_DIR, 'invoices', 'static')
@@ -331,8 +321,7 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         previous = invoice.status
         invoice.status = new_status
         invoice.save(update_fields=['status', 'updatedAt'])
-        log_audit(invoice, f'Status changed to {new_status}', request.user, previous, new_status, reason)
-
+        log_audit(invoice, f'Status changed to {new_status}', request.user, previous, new_status, reason, action_type='change_status')
         latest_payment = invoice.payments.order_by('-uploadedAt').first()
         if latest_payment:
             if new_status in ('under_verification', 'paid') and latest_payment.paymentStatus == 'pending':
@@ -358,8 +347,7 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         previous = str(invoice.dueDate)
         invoice.dueDate = new_due_date
         invoice.save(update_fields=['dueDate', 'updatedAt'])
-        log_audit(invoice, 'Extend due date', request.user, previous, new_due_date, request.data.get('reason', ''))
-
+        log_audit(invoice, 'Extend due date', request.user, previous, new_due_date, request.data.get('reason', ''), action_type='extend_due_date')
         serializer = InvoiceDetailSerializer(invoice)
         return Response(serializer.data)
 
@@ -382,8 +370,7 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             previous = invoice.status
             invoice.status = 'payment_submitted'
             invoice.save(update_fields=['status', 'updatedAt'])
-            log_audit(invoice, 'Payment uploaded', request.user, previous, invoice.status)
-
+            log_audit(invoice, 'Extend due date', request.user, previous, new_due_date, request.data.get('reason', ''), action_type='extend_due_date')
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=['get', 'post'], url_path='attachments')
@@ -422,21 +409,69 @@ class AuditLogListView(generics.ListAPIView):
     """
     Read-only at every layer — the model has no delete/update path exposed
     anywhere, admin.py blocks all writes, and this view is List-only.
+    Supports ?user_id=, ?role=, ?action=, ?date_from=, ?date_to=, ?ordering=
     """
     serializer_class = AuditLogSerializer
     permission_classes = [IsAuthenticated]
     pagination_class = StandardPagination
 
+    ALLOWED_ORDER_FIELDS = {'actionDate', 'userRole', 'action', 'performedBy__username'}
+
+    def list(self, request, *args, **kwargs):
+        if not has_permission(request.user, 'view_audit'):
+            return Response({'error': "You don't have permission to view the audit trail."}, status=status.HTTP_403_FORBIDDEN)
+        return super().list(request, *args, **kwargs)
+
     def get_queryset(self):
-        if not has_permission(self.request.user, 'view_audit'):
-            return AuditLog.objects.none()
         qs = AuditLog.objects.select_related('invoice', 'performedBy').order_by('-actionDate')
-        invoice_id = self.request.query_params.get('invoice_id')
-        if invoice_id:
-            qs = qs.filter(invoice_id=invoice_id)
+        p = self.request.query_params
+
+        if p.get('invoice_id'):
+            qs = qs.filter(invoice_id=p['invoice_id'])
+        if p.get('user_id'):
+            qs = qs.filter(performedBy_id=p['user_id'])
+        if p.get('role'):
+            qs = qs.filter(userRole=p['role'])
+        if p.get('action'):
+            qs = qs.filter(actionType=p['action'])
+        if p.get('date_from'):
+            qs = qs.filter(actionDate__date__gte=p['date_from'])
+        if p.get('date_to'):
+            qs = qs.filter(actionDate__date__lte=p['date_to'])
+
+        ordering = p.get('ordering')
+        if ordering and ordering.lstrip('-') in self.ALLOWED_ORDER_FIELDS:
+            qs = qs.order_by(ordering)
+
         return qs
 
+class AuditLogFilterOptionsView(APIView):
+    """GET /api/audit-logs/filter-options/ — populates the User/Role/Action dropdowns."""
+    permission_classes = [IsAuthenticated]
 
+    def get(self, request):
+        if not has_permission(request.user, 'view_audit'):
+            return Response({'error': "You don't have permission to view the audit trail."}, status=status.HTTP_403_FORBIDDEN)
+
+        user_rows = (
+            AuditLog.objects.exclude(performedBy__isnull=True)
+            .values_list('performedBy_id', 'performedBy__username')
+            .distinct()
+            .order_by('performedBy__username')
+        )
+        roles = (
+            AuditLog.objects.exclude(userRole='')
+            .values_list('userRole', flat=True)
+            .distinct()
+            .order_by('userRole')
+        )
+
+        return Response({
+            'users': [{'id': uid, 'username': uname} for uid, uname in user_rows],
+            'roles': list(roles),
+            'actionTypes': [{'value': v, 'label': l} for v, l in AuditLog.ACTION_TYPE_CHOICES],
+        })
+    
 class FeeConfigView(generics.GenericAPIView):
     """GET current active config, PUT to create a new active one (keeps history — see FeeConfig docstring)."""
     serializer_class = FeeConfigSerializer

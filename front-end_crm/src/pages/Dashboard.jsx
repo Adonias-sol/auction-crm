@@ -11,7 +11,7 @@ export default function Dashboard({ role, token }) {
   const [error, setError] = useState("");
 
   const canView = ["administrator", "auction_manager", "finance_manager", "viewer"].includes(role);
-
+  console.log(role)
   useEffect(() => {
     if (canView) fetchDashboardData();
     else setLoading(false);

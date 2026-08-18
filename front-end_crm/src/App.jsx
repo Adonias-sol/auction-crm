@@ -129,7 +129,7 @@ export default function App() {
           {page === "queues" && <Queues token={session.token} />}
           {page === "reports" && <Reports role={session.role} token={session.token} />}
           {page === "callcenter" && <CallCenter role={session.role} token={session.token} />} 
-          {page === "audit" && <AuditTrail token={session.token} />}
+          {page === "audit" && <AuditTrail role={session.role} token={session.token} />}
           {page === "employees" && <Employees role={session.role} token={session.token} />}
         </div>  
       </div>

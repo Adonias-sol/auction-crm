@@ -126,7 +126,8 @@ export default function App() {
             onOpenDetail={setDetailInvNumber}
           />
             )}
-          {page === "queues" && <Queues token={session.token} />}
+          {page === "dashboard" && <Dashboard role={session.role} token={session.token} />}
+          {page === "queues" && <Queues role={session.role} token={session.token} />}
           {page === "reports" && <Reports role={session.role} token={session.token} />}
           {page === "callcenter" && <CallCenter role={session.role} token={session.token} />} 
           {page === "audit" && <AuditTrail role={session.role} token={session.token} />}

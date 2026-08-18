@@ -33,10 +33,9 @@ export default function AuditTrail({ role, token }) {
   const [count, setCount] = useState(0);
 
   const canView = role === "administrator" || role === "finance_manager";
-
-  useEffect(() => { fetchFilterOptions(); }, []);
+  useEffect(() => { if (canView) fetchFilterOptions(); }, []);
   useEffect(() => { setPage(1); }, [filters]);
-  useEffect(() => { fetchLogs(); }, [filters, ordering, page]);
+  useEffect(() => { if (canView) fetchLogs(); }, [filters, ordering, page]);
 
   async function fetchFilterOptions() {
     try {

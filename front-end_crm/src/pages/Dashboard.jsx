@@ -3,16 +3,19 @@ import { periodLabels, statusLabels, money } from "../data";
 import PeriodDropdown from "../components/PeriodDropdown";
 import { apiCall } from "../api";
 
-export default function Dashboard({ token }) {
+export default function Dashboard({ role, token }) {
   const [receivedPeriod, setReceivedPeriod] = useState("today");
   const [statusPeriod, setStatusPeriod] = useState("today");
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  const canView = ["administrator", "auction_manager", "finance_manager", "viewer"].includes(role);
+
   useEffect(() => {
-    fetchDashboardData();
-  }, [receivedPeriod, statusPeriod, token]);
+    if (canView) fetchDashboardData();
+    else setLoading(false);
+  }, [token]);
 
   async function fetchDashboardData() {
     try {
@@ -38,52 +41,45 @@ export default function Dashboard({ token }) {
     }
   }
 
+  if (!canView) {
+    return (
+      <div className="card">
+        <h3 style={{ margin: "0 0 6px" }}>Financial dashboard</h3>
+        <div className="locked-note">You don't have permission to view the financial dashboard.</div>
+      </div>
+    );
+  }
+
   if (loading) return <div style={{ padding: 20 }}>Loading dashboard...</div>;
   if (error) return <div style={{ padding: 20, color: 'red' }}>{error}</div>;
+  if (!stats) return null;
 
-  // Compute stats from real invoices
-  const invoices = stats?.invoices || [];
-  const totalCollected = invoices
-    .filter(inv => ['paid', 'waived'].includes(inv.status))
-    .reduce((sum, inv) => sum + parseFloat(inv.totalAmount || 0), 0);
-  
-  const outstanding = invoices
-    .filter(inv => !['paid', 'waived', 'cancelled'].includes(inv.status))
-    .reduce((sum, inv) => sum + parseFloat(inv.totalAmount || 0), 0);
-  
-  const unpaidCount = invoices.filter(inv => 
-    !['paid', 'waived', 'cancelled'].includes(inv.status)
-  ).length;
+  // Read the pre-aggregated fields the backend actually sends — do not
+  // recompute these from a raw invoice list, the summary endpoint never
+  // returns one.
+  const totalCollected = parseFloat(stats.totalCollected || 0);
+  const outstanding = parseFloat(stats.totalOutstanding || 0);
+  const totalInvoices = stats.totalInvoices || 0;
+  const collectionPct = stats.collectionPercentage || "0.00";
 
-  // Group by status
-  const statusCounts = Object.keys(statusLabels).reduce((acc, key) => {
-    acc[key] = invoices.filter(inv => inv.status === key).length;
-    return acc;
-  }, {});
+  const receivedThisPeriod = receivedPeriod === "today"
+    ? parseFloat(stats.paymentsReceivedToday || 0)
+    : parseFloat(stats.paymentsReceivedThisMonth || 0);
 
-  // Top auctions by revenue
-  const auctionRevenue = {};
-  invoices.forEach(inv => {
-    const auctionName = inv.lots?.[0]?.auctionName || 'Unknown';
-    auctionRevenue[auctionName] = (auctionRevenue[auctionName] || 0) + parseFloat(inv.totalAmount || 0);
-  });
-  const topAuctions = Object.entries(auctionRevenue)
-    .sort(([, a], [, b]) => b - a)
-    .slice(0, 5)
-    .map(([name, total]) => [name, Math.round(total / Math.max(...Object.values(auctionRevenue)) * 100), total.toFixed(2)]);
+  const statusCounts = {
+    invoice_generated: stats.invoiceGeneratedCount || 0,
+    pending_payment: stats.pendingPaymentCount || 0,
+    payment_submitted: stats.paymentSubmittedCount || 0,
+    under_verification: stats.underVerificationCount || 0,
+    paid: stats.paidCount || 0,
+    overdue: stats.overdueCount || 0,
+    cancelled: stats.cancelledCount || 0,
+    waived: stats.waivedCount || 0,
+  };
 
-  // Top clients by revenue
-  const clientRevenue = {};
-  invoices.forEach(inv => {
-    const clientName = inv.winner?.companyName || inv.winner?.bidderName || 'Unknown';
-    clientRevenue[clientName] = (clientRevenue[clientName] || 0) + parseFloat(inv.totalAmount || 0);
-  });
-  const topClients = Object.entries(clientRevenue)
-    .sort(([, a], [, b]) => b - a)
-    .slice(0, 3)
-    .map(([name, total]) => [name, Math.round(total / Math.max(...Object.values(clientRevenue)) * 100), total.toFixed(2)]);
-
-  const collectionPct = totalCollected && (totalCollected / (totalCollected + outstanding) * 100).toFixed(1);
+  const unpaidCount = Object.entries(statusCounts)
+    .filter(([status]) => !['paid', 'waived', 'cancelled'].includes(status))
+    .reduce((sum, [, count]) => sum + count, 0);
 
   return (
     <div>
@@ -91,7 +87,7 @@ export default function Dashboard({ token }) {
         <div className="card">
           <div className="stat-label">Total fees collected</div>
           <div className="stat-value up">ETB {money(totalCollected.toFixed(2))}</div>
-          <div className="stat-foot">Across {invoices.length} invoices</div>
+          <div className="stat-foot">Across {totalInvoices} invoices</div>
         </div>
         <div className="card">
           <div className="stat-label">Outstanding fees</div>
@@ -103,7 +99,7 @@ export default function Dashboard({ token }) {
             <div className="stat-label">Received — {periodLabels[receivedPeriod].toLowerCase()}</div>
             <PeriodDropdown value={receivedPeriod} onChange={setReceivedPeriod} />
           </div>
-          <div className="stat-value">ETB {money(totalCollected.toFixed(2))}</div>
+          <div className="stat-value">ETB {money(receivedThisPeriod.toFixed(2))}</div>
           <div className="stat-foot">Payments verified in this period</div>
         </div>
         <div className="card">
@@ -121,35 +117,12 @@ export default function Dashboard({ token }) {
         <div className="status-strip">
           {Object.keys(statusLabels).map((k) => (
             <div className="status-chip" key={k}>
-              <div className="n">{statusCounts[k]}</div>
+              <div className="n">{statusCounts[k] || 0}</div>
               <div className="l">{statusLabels[k]}</div>
             </div>
           ))}
         </div>
       </div>
-
-      <div className="grid grid-2">
-        <div className="card">
-          <h3 style={{ margin: "0 0 4px" }}>Revenue by auction</h3>
-          {topAuctions.length ? topAuctions.map(([name, pct, val]) => (
-            <div className="bar-row" key={name}>
-              <span className="name">{name}</span>
-              <div className="bar-track"><div className="bar-fill" style={{ width: pct + "%" }}></div></div>
-              <span className="val">ETB {money(val)}</span>
-            </div>
-          )) : <p>No auction data</p>}
-        </div>
-        <div className="card">
-          <h3 style={{ margin: "0 0 4px" }}>Revenue by client</h3>
-          {topClients.length ? topClients.map(([name, pct, val]) => (
-            <div className="bar-row" key={name}>
-              <span className="name">{name}</span>
-              <div className="bar-track"><div className="bar-fill" style={{ width: pct + "%" }}></div></div>
-              <span className="val">ETB {money(val)}</span>
-            </div>
-          )) : <p>No client data</p>}
-        </div>
-      </div>
     </div>
   );
-}
+} 

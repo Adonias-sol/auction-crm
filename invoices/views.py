@@ -171,8 +171,9 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             invoice.status = 'pending_payment'
             invoice.save(update_fields=['status', 'updatedAt'])
             log_audit(invoice, 'Generate invoice PDF', request.user, previous, invoice.status, action_type='generate_invoice_pdf')
-
-        images = {}
+        else:
+            log_audit(invoice, 'Generate invoice PDF', request.user, invoice.status, invoice.status, action_type='generate_invoice_pdf')
+                images = {}
         static_dir = os.path.join(settings.BASE_DIR, 'invoices', 'static')
         for filename, key in [('logo.png', 'logo'), ('stamp.png', 'stamp'),
                                ('signature.png', 'signature'), ('footer.png', 'footer'),('watermark.png', 'watermark')]:

@@ -108,6 +108,10 @@ a{color:inherit;}
 .btn-ghost{background:transparent;}
 .btn-danger{background:var(--red-bg);color:var(--red);border-color:var(--red);}
 .btn-sm{padding:5px 10px;font-size:12px;}
+.btn-blue{background:var(--blue-bg);color:var(--blue);border-color:var(--blue);}
+.btn-blue:hover{background:var(--blue);color:#fff;}
+.btn-amber{background:var(--amber-bg);color:var(--amber);border-color:var(--amber);}
+.btn-amber:hover{background:var(--amber);color:#fff;}
 .btn[disabled], .btn.locked{opacity:0.35;cursor:not-allowed;pointer-events:none;}
 .card.locked, .section.locked{opacity:0.4;pointer-events:none;}
 

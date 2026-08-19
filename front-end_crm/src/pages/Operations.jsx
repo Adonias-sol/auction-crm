@@ -22,33 +22,34 @@ export default function Operations({ role, token, onOpenDetail }) {
     fetchInvoices();
   }, [currentPage, token]);
  
-  async function fetchInvoices() {
+  const [hasNext, setHasNext] = useState(false);
+
+async function fetchInvoices() {
   try {
     setLoading(true);
-    console.log('Fetching invoices with token:', token);
-    
     const response = await apiCall(`/api/invoices/?page=${currentPage}`, {
       method: 'GET',
       headers: token ? { Authorization: `Token ${token}` } : {},
     });
 
-    console.log('Response status:', response.status);
-    const data = await response.json();
-    console.log('Response data:', data);
-
     if (!response.ok) {
+      if (response.status === 404 && currentPage > 1) {
+        // fell past the last page — step back instead of erroring
+        setCurrentPage((p) => Math.max(1, p - 1));
+        return;
+      }
       setError(`Failed to load invoices: ${response.status}`);
-      console.error('API error:', data);
       return;
     }
 
+    const data = await response.json();
     const invoiceList = data.results || data;
-    console.log('Invoices loaded:', invoiceList);
     setInvoices(invoiceList);
+    setHasNext(Boolean(data.next));
     setError("");
   } catch (err) {
-    console.error('Network error:', err);
     setError('Network error loading invoices');
+    console.error(err);
   } finally {
     setLoading(false);
   }
@@ -195,23 +196,80 @@ export default function Operations({ role, token, onOpenDetail }) {
   }
   
 const canDelete = role === "administrator";
-async function deleteInvoice(invId) {
-  if (!window.confirm("Delete this invoice permanently? This cannot be undone.")) return;
+const [showBulkUpdate, setShowBulkUpdate] = useState(false);
+
+async function deleteSelected() {
+  if (selected.length === 0) return;
+  if (!window.confirm(`Delete ${selected.length} invoice${selected.length > 1 ? "s" : ""} permanently? This cannot be undone.`)) return;
   try {
-    const response = await apiCall(`/api/invoices/${invId}/`, {
-      method: 'DELETE',
-      headers: token ? { Authorization: `Token ${token}` } : {},
-    });
-    if (response.ok || response.status === 204) {
-      await fetchInvoices();
-      setSelected((s) => s.filter((id) => id !== invId));
-    } else {
-      setError('Failed to delete invoice');
+    for (const id of selected) {
+      await apiCall(`/api/invoices/${id}/`, {
+        method: 'DELETE',
+        headers: token ? { Authorization: `Token ${token}` } : {},
+      });
     }
+    await fetchInvoices();
+    setSelected([]);
   } catch (err) {
-    setError('Network error deleting invoice');
+    setError('Failed to delete one or more invoices');
     console.error(err);
   }
+}
+
+function openBulkUpdate() {
+  if (selected.length === 0) {
+    window.alert("Select at least one invoice first.");
+    return;
+  }
+  setShowBulkUpdate(true);
+}
+
+async function confirmBulkUpdate(newStatus) {
+  try {
+    for (const id of selected) {
+      await apiCall(`/api/invoices/${id}/change-status/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Token ${token}` } : {}) },
+        body: JSON.stringify({ status: newStatus }),
+      });
+    }
+    await fetchInvoices();
+    setSelected([]);
+    setShowBulkUpdate(false);
+  } catch (err) {
+    setError('Bulk update failed');
+    console.error(err);
+  }
+}
+
+function exportRecords() {
+  const rowsToExport = selected.length > 0 ? invoices.filter((inv) => selected.includes(inv.id)) : rows;
+  if (rowsToExport.length === 0) {
+    window.alert("No records to export.");
+    return;
+  }
+  const headers = ["Invoice #", "Bidder", "Company", "Lots", "Total Amount", "Due Date", "Status"];
+  const csvRows = rowsToExport.map((inv) => [
+    inv.invoiceNumber,
+    inv.bidderName,
+    inv.companyName || "",
+    inv.lots?.length || 0,
+    inv.totalAmount,
+    inv.dueDate,
+    inv.status,
+  ]);
+  const csv = [headers, ...csvRows]
+    .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","))
+    .join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `invoices_export_${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  window.URL.revokeObjectURL(url);
+  document.body.removeChild(a);
 }
 
   if (loading) return <div style={{ padding: 20 }}>Loading invoices...</div>;
@@ -252,8 +310,22 @@ async function deleteInvoice(invId) {
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginBottom: 12, alignItems: "center" }}>
         {selected.length > 0 && <span style={{ fontSize: 12.5, color: "var(--text-2)" }}>{selected.length} selected</span>}
         <ActionBtn label="Generate invoice PDF" roles={PDF_ROLES} role={role} onClick={openGenerateModal} />
-        <ActionBtn label="Export records" roles={["administrator", "auction_manager", "finance_manager"]} role={role} />
-        <ActionBtn label="Bulk update" roles={["administrator"]} role={role} />
+        <button className="btn btn-blue" onClick={exportRecords}>Export records</button>
+        {role === "administrator" && (
+          <button className="btn btn-amber" onClick={openBulkUpdate} disabled={selected.length === 0}>
+            Bulk update status
+          </button>
+        )}
+        {canDelete && (
+          <button
+            className="btn btn-danger"
+            onClick={deleteSelected}
+            disabled={selected.length === 0}
+            title="Delete selected invoices"
+          >
+            🗑 Delete{selected.length > 0 ? ` (${selected.length})` : ""}
+          </button>
+        )}
       </div>
 
       <div className="tbl-wrap">
@@ -264,7 +336,7 @@ async function deleteInvoice(invId) {
                 <th style={{ width: 32 }}>
                   {canGeneratePdf && <input type="checkbox" checked={rows.length > 0 && selected.length === rows.length} onChange={toggleAll} />}
                 </th>
-                <th>Invoice #</th><th>Bidder</th><th>Company</th><th>Lots</th><th>Total amount</th><th>Due date</th><th>Status</th><th></th>
+                <th>Invoice #</th><th>Bidder</th><th>Company</th><th>Lots</th><th>Total amount</th><th>Due date</th><th>Status</th>
               </tr>
             </thead>
             <tbody>
@@ -292,18 +364,10 @@ async function deleteInvoice(invId) {
                   <td>{inv.bidderName}</td>
                   <td>{inv.companyName || <span style={{ color: "var(--text-3)" }}>—</span>}</td>
                   <td className="mono">{inv.lots?.length || 0}</td>
-                  <td className="amount">ETB {money(inv.totalAmount.toFixed(2))}</td>
+                  <td className="amount">{money(inv.totalAmount.toFixed(2))}</td>
                   <td className="mono">{new Date(inv.dueDate).toLocaleDateString()}</td>
                   <td><StatusCell invoice={inv} role={role} onChangeStatus={changeStatus} /></td>
-                  <td>
-                    {canDelete && (
-                      <button className="btn btn-sm btn-danger" onClick={() => deleteInvoice(inv.id)}>
-                        Delete
-                      </button>
-                    )}
-                  </td>
-                  
-                </tr>
+                  </tr>
               ))}
             </tbody>
           </table>
@@ -312,7 +376,7 @@ async function deleteInvoice(invId) {
           <span>Showing {invoices.length} records</span>
           <div className="btns">
             <button className="btn btn-sm" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}>Previous</button>
-            <button className="btn btn-sm" onClick={() => setCurrentPage(p => p + 1)}>Next</button>
+            <button className="btn btn-sm" onClick={() => setCurrentPage(p => p + 1)} disabled={!hasNext}>Next</button>
           </div>
         </div>
       </div>
@@ -327,6 +391,29 @@ async function deleteInvoice(invId) {
           onConfirm={confirmGeneratePdf}
           onClose={() => setShowGenerateModal(false)}
         />
+      )}
+      {showBulkUpdate && (
+        <div className="overlay active" onClick={(e) => { if (e.target === e.currentTarget) setShowBulkUpdate(false); }}>
+          <div className="modal" style={{ maxWidth: 420 }}>
+            <div className="modal-head">
+              <h2 style={{ margin: 0 }}>Bulk update status</h2>
+              <button className="modal-close" onClick={() => setShowBulkUpdate(false)}>&times;</button>
+            </div>
+            <div className="modal-body">
+              <div className="locked-note" style={{ marginBottom: 14 }}>
+                Sets the new status on all {selected.length} selected invoices. Locked statuses (Paid,
+                Cancelled, Waived) and disallowed transitions are skipped per invoice.
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                {["pending_payment", "under_verification", "paid", "overdue", "cancelled", "waived"].map((s) => (
+                  <button key={s} className="btn btn-sm" onClick={() => confirmBulkUpdate(s)}>
+                    {s.replace(/_/g, " ")}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

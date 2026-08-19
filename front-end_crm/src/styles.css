@@ -139,13 +139,15 @@ a{color:inherit;}
 .btn-danger {
   background: transparent;
   color: var(--red);
-  border: none;
+  border: 1px solid var(--red);
   border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
 }
 
 .btn-danger:hover:not(:disabled) {
-  background: var(--red-bg);
-  color: var(--red);
+  background: var(--red);
+  color: white;
 }
 
 .btn-danger:disabled {

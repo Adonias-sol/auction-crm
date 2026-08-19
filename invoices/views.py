@@ -154,6 +154,11 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         amount_in_words = request.data.get('amountInWords', '').strip()
         fee_in_words = request.data.get('feeInWords', '').strip()
         office_address = request.data.get('officeAddress', '').strip()
+        total_amount_override = request.data.get('totalAmount')
+        fee_amount_override = request.data.get('feeAmount')
+        bank_account_override = request.data.get('bankAccount', '').strip()
+        paragraph1_override = request.data.get('paragraph1', '').strip()
+        paragraph2_override = request.data.get('paragraph2', '').strip()
 
         if fee_percentage is not None:
             fee_percentage = Decimal(str(fee_percentage))
@@ -186,6 +191,8 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             html_string = self._render_invoice_html(
                 invoice, auction_ref_number, images,
                 amount_in_words, fee_in_words, office_address,
+                total_amount_override, fee_amount_override, bank_account_override,
+                paragraph1_override, paragraph2_override,
             )
             pdf_bytes = HTML(string=html_string).write_pdf()
             return FileResponse(
@@ -197,26 +204,44 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         except Exception as e:
             return Response({'detail': f'PDF generation failed: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    def _render_invoice_html(self, invoice, auction_ref_number, images,amount_in_words='', fee_in_words='', office_address=''):
-        """
-        Matches the official Auction Ethiopia letter format exactly —
-        only the bracketed values below differ per invoice.
-        """
+    def _render_invoice_html(self, invoice, auction_ref_number, images,amount_in_words='', fee_in_words='', office_address='',total_amount_override=None, fee_amount_override=None,bank_account_override='', paragraph1_override='', paragraph2_override=''):
         winner = invoice.winner
         display_name = winner.bidderNameAmharic or winner.bidderName
         lots = list(invoice.lots.all())
 
-        total_amount = sum((lot.winningAmount for lot in lots), Decimal('0.00'))
-        total_fee = sum((lot.lotFee for lot in lots), Decimal('0.00'))
+        total_amount = (
+            Decimal(str(total_amount_override))
+            if total_amount_override not in (None, '')
+            else sum((lot.winningAmount for lot in lots), Decimal('0.00'))
+        )
+        total_fee = (
+            Decimal(str(fee_amount_override))
+            if fee_amount_override not in (None, '')
+            else sum((lot.lotFee for lot in lots), Decimal('0.00'))
+        )
         fee_percentage = lots[0].feePercentage.normalize() if lots else Decimal('0')
         auction_name = lots[0].auctionName if lots else ''
         lot_numbers = _join_amharic_list([lot.lotNumber for lot in lots])
+        bank_account = bank_account_override or "1000547266289"
 
-        amount_words_part = f" ({amount_in_words})" if amount_in_words else ""
-        fee_words_part = f" ({fee_in_words})" if fee_in_words else ""
+        if paragraph1_override:
+            paragraph1 = paragraph1_override
+        else:
+            amount_words_part = f" ({amount_in_words})" if amount_in_words else ""
+            fee_words_part = f" ({fee_in_words})" if fee_in_words else ""
+            paragraph1 = (
+                f"{auction_name} ለኩባንያው አገልግሎት የማያሰጡ የተለያዩ ዕቃዎችን በጨረታ አወዳድሮ ለመሸጥ ባወጣው የጨረታ ቁጥር {auction_ref_number} "
+                f"ተሳትፈው በሎት ቁጥር {lot_numbers} የተጠቀሱትን ለመግዛት ባቀረቡት ጠቅላላ ዋጋ ቫትን ጨምሮ ብር {total_amount:,.2f}{amount_words_part} ሲሆን "
+                f"የንብረቶቹን ርክክብ መመሪያ ተመልክተው ከተረከቡ በኋላ ከአሸነፉበት ዋጋ ላይ የሚታሰብ {fee_percentage}% (processing fee) {total_fee:,.2f}{fee_words_part} "
+                f"ለአክሽን ኢትዮጵያ የሚከፍሉ ይሆናል፡፡"
+            )
 
-        default_address = "ቦሌ አትላስ ከአውሮፓ ዩኒየን ዝቅ ብሎ ከለላ ህንጻ 3ኛ ፎቅ ቢሮ ቁጥር 301"
-        address_text = office_address or default_address
+        if paragraph2_override:
+            paragraph2 = paragraph2_override
+        else:
+            default_address = "ቦሌ አትላስ ከአውሮፓ ዩኒየን ዝቅ ብሎ ከለላ ህንጻ 3ኛ ፎቅ ቢሮ ቁጥር 301"
+            address_text = office_address or default_address
+            paragraph2 = f"ስለሆነም በኢትዮጵያ ንግድ ባንክ የሂሳብ ቁጥር {bank_account} ገቢ በማድረግ {address_text} በአካል በመገኘት ደረሰኝ እንዲያስገቡ እንጠይቃለን፡፡"
 
         return f"""
         <!DOCTYPE html>
@@ -224,17 +249,8 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         <head>
             <meta charset="UTF-8">
             <style>
-                @page {{
-                    size: A4;
-                    margin: 0;
-                }}
-                body {{
-                    font-family: 'Noto Sans Ethiopic', sans-serif;
-                    font-size: 16.5px;
-                    color: #111;
-                    margin: 0;
-                    padding: 45px 55px 0 55px;
-                }}
+                @page {{ size: A4; margin: 0; }}
+                body {{ font-family: 'Noto Sans Ethiopic', sans-serif; font-size: 16.5px; color: #111; margin: 0; padding: 45px 55px 0 55px; }}
                 .header {{ display: flex; justify-content: space-between; align-items: flex-start; }}
                 .logo img {{ width: 240px; }}
                 .ref-block {{ text-align: right; font-size: 14.5px; }}
@@ -242,25 +258,11 @@ class InvoiceViewSet(viewsets.ModelViewSet):
                 .ref-block .val {{ text-decoration: underline; }}
                 hr.rule {{ border: none; border-top: 1px solid #999; margin: 12px 0 30px 0; }}
                 .salutation {{ margin: 0 0 15px 0; font-size: 14.5px; }}
-                .subject {{
-                    text-align: center; font-weight: bold; text-decoration: underline;
-                    margin: 20px 0; font-size: 14.5px;
-                }}
+                .subject {{ text-align: center; font-weight: bold; text-decoration: underline; margin: 20px 0; font-size: 14.5px; }}
                 .body-text {{ text-align: justify; line-height: 2.1; font-size: 14.5px; margin-bottom: 18px; }}
                 .closing {{ text-align: right; margin-top: 50px; font-size: 14.5px; }}
-                .stamp-sig-row {{
-                    display: flex; justify-content: space-between; align-items: center;
-                    margin-top: 40px;
-                }}
-                .watermark {{
-                    position: fixed;
-                    left: 25%;
-                    top: 50%;
-                    transform: translate(-50%, -25%);
-                    opacity: 0.3;
-                    z-index: -1;
-                    width: 900px;
-                }}
+                .stamp-sig-row {{ display: flex; justify-content: space-between; align-items: center; margin-top: 40px; }}
+                .watermark {{ position: fixed; left: 25%; top: 50%; transform: translate(-50%, -25%); opacity: 0.3; z-index: -1; width: 900px; }}
                 .stamp-img {{ width: 250px; margin-left: 50px; }}
                 .sig-block {{ text-align: right; font-size: 10.5px; }}
                 .sig-img {{ width: 60px; display: block; margin-left: auto; margin-bottom: 4px; }}
@@ -278,28 +280,15 @@ class InvoiceViewSet(viewsets.ModelViewSet):
                 </div>
             </div>
             <hr class="rule">
-
             <div class="salutation">
                 <div>ለ {display_name}</div>
                 <div>ባሉበት</div>
             </div>
-
             <div class="subject">ጉዳይ፡- የጨረታ processing fee እንዲከፍሉ ስለማሳወቅ</div>
-
-            <div class="body-text">
-                {auction_name} ለኩባንያው አገልግሎት የማያሰጡ የተለያዩ ዕቃዎችን በጨረታ አወዳድሮ ለመሸጥ ባወጣው የጨረታ ቁጥር {auction_ref_number} ተሳትፈው በሎት ቁጥር {lot_numbers} የተጠቀሱትን ለመግዛት ባቀረቡት ጠቅላላ ዋጋ ቫትን ጨምሮ ብር {total_amount:,.2f}{amount_words_part} ሲሆን የንብረቶቹን ርክክብ መመሪያ ተመልክተው ከተረከቡ በኋላ ከአሸነፉበት ዋጋ ላይ የሚታሰብ {fee_percentage}% (processing fee) {total_fee:,.2f}{fee_words_part} ለአክሽን ኢትዮጵያ የሚከፍሉ ይሆናል፡፡
-            </div>
-
-            <div class="body-text">
-                ስለሆነም በኢትዮጵያ ንግድ ባንክ የሂሳብ ቁጥር 1000547266289 ገቢ በማድረግ {address_text} በአካል በመገኘት ደረሰኝ እንዲያስገቡ እንጠይቃለን፡፡
-            </div>
-
-            <div class="body-text">
-                ማሳሰቢያ፡- ለጨረታ መወዳደሪያ ያስያዙት ሲ.ፒ.ኦ ተመላሽ የሚደረገው processing fee መከፈላችሁ ከተረጋገጠ በኋላ ነው፡፡
-            </div>
-
+            <div class="body-text">{paragraph1}</div>
+            <div class="body-text">{paragraph2}</div>
+            <div class="body-text">ማሳሰቢያ፡- ለጨረታ መወዳደሪያ ያስያዙት ሲ.ፒ.ኦ ተመላሽ የሚደረገው processing fee መከፈላችሁ ከተረጋገጠ በኋላ ነው፡፡</div>
             <div class="closing">ከሰላምታ ጋር</div>
-
             <div class="stamp-sig-row">
                 <img class="stamp-img" src="data:image/png;base64,{images['stamp']}">
                 <div class="sig-block">
@@ -308,7 +297,6 @@ class InvoiceViewSet(viewsets.ModelViewSet):
                     <div>የደንበኞች አስተዳደር</div>
                 </div>
             </div>
-
             <div class="footer-band"><img src="data:image/png;base64,{images['footer']}"></div>
         </body>
         </html>

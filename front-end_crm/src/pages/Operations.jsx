@@ -134,7 +134,12 @@ export default function Operations({ role, token, onOpenDetail }) {
     setShowGenerateModal(true);
   }
 
-  async function confirmGeneratePdf({ percentagesByInvId, auctionRefNumber, amhNames, amountWordsByInv = {}, feeWordsByInv = {}, officeAddress = '' }) {
+  async function confirmGeneratePdf({
+    percentagesByInvId, auctionRefNumber, amhNames,
+    amountWordsByInv = {}, feeWordsByInv = {}, officeAddress = '',
+    totalAmountByInv = {}, feeAmountByInv = {}, bankAccountByInv = {},
+    paragraph1ByInv = {}, paragraph2ByInv = {},
+  }) {
     try {
       for (const [invId, pct] of Object.entries(percentagesByInvId)) {
         const amhName = amhNames[invId] || '';
@@ -152,8 +157,14 @@ export default function Operations({ role, token, onOpenDetail }) {
             amountInWords: amountWordsByInv[invId] || '',
             feeInWords: feeWordsByInv[invId] || '',
             officeAddress: officeAddress || '',
+            totalAmount: totalAmountByInv[invId] || '',
+            feeAmount: feeAmountByInv[invId] || '',
+            bankAccount: bankAccountByInv[invId] || '',
+            paragraph1: paragraph1ByInv[invId] || '',
+            paragraph2: paragraph2ByInv[invId] || '',
           }),
         });
+      // ...rest unchanged
       // ...rest unchanged
 
         if (!response.ok) {

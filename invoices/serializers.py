@@ -147,6 +147,7 @@ class InvoiceWinnerFieldsMixin:
 
 class InvoiceListSerializer(InvoiceWinnerFieldsMixin, serializers.ModelSerializer):
     winner = WinnerSerializer(read_only=True)
+    lots = InvoiceLotSerializer(many=True, read_only=True)
     totalAmount = serializers.ReadOnlyField()
     bidderName = serializers.SerializerMethodField()
     companyName = serializers.SerializerMethodField()
@@ -158,9 +159,8 @@ class InvoiceListSerializer(InvoiceWinnerFieldsMixin, serializers.ModelSerialize
             'id', 'invoiceNumber', 'invoiceDate', 'dueDate', 'winner',
             'totalAmount', 'status', 'createdAt', 'updatedAt',
             'bidderName', 'companyName', 'winnerPhone',
-            'callNotes',
+            'callNotes', 'lots',
         ]
-
 # -------------------------------------------------- Invoice (detail view)
 
 class InvoiceDetailSerializer(InvoiceWinnerFieldsMixin, serializers.ModelSerializer):

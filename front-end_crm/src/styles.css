@@ -106,8 +106,9 @@ a{color:inherit;}
 .btn-primary{background:var(--ink);color:#fff;border-color:var(--ink);}
 .btn-brass{background:var(--brass);color:#fff;border-color:var(--brass);}
 .btn-ghost{background:transparent;}
-.btn-danger{background:var(--red-bg);color:var(--red);border-color:var(--red);}
+
 .btn-sm{padding:5px 10px;font-size:12px;}
+
 
 .btn-blue{background:var(--blue);color:#fff;border-color:var(--blue);}
 .btn-blue:hover{opacity:0.85;}
@@ -115,6 +116,40 @@ a{color:inherit;}
 .btn-amber:hover{opacity:0.85;}
 .btn[disabled], .btn.locked{opacity:0.35;cursor:not-allowed;pointer-events:none;}
 .card.locked, .section.locked{opacity:0.4;pointer-events:none;}
+
+.btn-delete {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  font-size: 14px;
+}
+
+.btn-icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.btn-danger {
+  background: var(--red-bg);
+  color: var(--red);
+  border: 1px solid var(--red);
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: var(--red);
+  color: white;
+}
+
+.btn-danger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 
 table{width:100%;border-collapse:collapse;font-size:13px;}
 th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:0.04em;color:var(--text-2);font-weight:600;padding:10px 12px;border-bottom:1px solid var(--border);}

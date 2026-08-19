@@ -307,23 +307,51 @@ function exportRecords() {
         <button className="btn btn-ghost" onClick={clearSearch}>Clear</button>
       </div>
 
-      <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginBottom: 12, alignItems: "center" }}>
-        {selected.length > 0 && <span style={{ fontSize: 12.5, color: "var(--text-2)" }}>{selected.length} selected</span>}
-        <ActionBtn label="Generate invoice PDF" roles={PDF_ROLES} role={role} onClick={openGenerateModal} />
-        <button className="btn btn-blue" onClick={exportRecords}>Export records</button>
-        {role === "administrator" && (
-          <button className="btn btn-amber" onClick={openBulkUpdate} disabled={selected.length === 0}>
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginBottom: 12, alignItems: "center" }}> 
+        {selected.length > 0 && (
+          <span style={{ fontSize: 12.5, color: "var(--text-2)" }}>
+            {selected.length} selected
+          </span>
+        )}
+
+        <ActionBtn
+          label="Generate invoice PDF"
+          roles={PDF_ROLES}
+          role={role}
+          onClick={openGenerateModal}
+        />
+
+        <button className="btn btn-blue" onClick={exportRecords}>
+          Export records
+        </button>
+
+        {role === "administrator" && ( 
+          <button
+            className="btn btn-amber"
+            onClick={openBulkUpdate}
+            disabled={selected.length === 0}
+          >
             Bulk update status
           </button>
         )}
+
         {canDelete && (
           <button
-            className="btn btn-danger"
+            className="btn btn-danger btn-delete"
             onClick={deleteSelected}
             disabled={selected.length === 0}
             title="Delete selected invoices"
           >
-            🗑{selected.length > 0 ? ` (${selected.length})` : ""}
+            <svg
+              className="btn-icon"
+              viewBox="0 0 24 24"
+              width="18"
+              height="18"
+              fill="currentColor"
+            >
+              <path d="M16 9v10H8V9h8m-1.5-6h-5l-1 1H5v2h14V4h-3.5l-1-1zM9 16h2v-7H9v7zm4 0h2v-7h-2v7z" />
+            </svg>
+            {selected.length > 0 ? `Delete (${selected.length})` : "Delete"}
           </button>
         )}
       </div>

@@ -3,7 +3,7 @@ from rest_framework import serializers
 
 from .models import (
     StaffProfile, Auction, Winner, ImportBatch, FeeConfig,
-    Invoice, InvoiceLot, Payment, Attachment, AuditLog,
+    Invoice, InvoiceLot, Payment, Attachment, AuditLog,OfficeSettings,
 )
 
 
@@ -122,14 +122,13 @@ class AuditLogSerializer(serializers.ModelSerializer):
     class Meta:
         model = AuditLog
         fields = [
-            'id', 'invoice', 'action', 'performedBy', 'userRole',
+            'id', 'invoice', 'action', 'actionType', 'performedBy', 'userRole',
             'previousValue', 'newValue', 'reason', 'actionDate',
         ]
         read_only_fields = fields
 
     def get_performedBy(self, obj):
         return user_display_name(obj.performedBy)
-
 
 # ------------------------------------------------------- Invoice (shared)
 
@@ -280,3 +279,13 @@ class EmployeeSerializer(serializers.ModelSerializer):
 
     def get_privilegeCount(self, obj):
         return f"{len(obj.privileges)}/{len(PRIVILEGE_CATALOG)}"
+    
+class OfficeSettingsSerializer(serializers.ModelSerializer):
+    configuredBy = serializers.SerializerMethodField()
+
+    class Meta:
+        model = OfficeSettings
+        fields = ['address', 'configuredBy', 'configuredAt']
+
+    def get_configuredBy(self, obj):
+        return user_display_name(obj.configuredBy)

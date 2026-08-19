@@ -134,7 +134,7 @@ export default function Operations({ role, token, onOpenDetail }) {
     setShowGenerateModal(true);
   }
 
-  async function confirmGeneratePdf({ percentagesByInvId, auctionRefNumber, amhNames }) {
+  async function confirmGeneratePdf({ percentagesByInvId, auctionRefNumber, amhNames, amountWordsByInv = {}, feeWordsByInv = {}, officeAddress = '' }) {
     try {
       for (const [invId, pct] of Object.entries(percentagesByInvId)) {
         const amhName = amhNames[invId] || '';
@@ -149,8 +149,12 @@ export default function Operations({ role, token, onOpenDetail }) {
             feePercentage: parseFloat(pct),
             auctionRefNumber: auctionRefNumber || '',
             bidderNameAmharic: amhName,
+            amountInWords: amountWordsByInv[invId] || '',
+            feeInWords: feeWordsByInv[invId] || '',
+            officeAddress: officeAddress || '',
           }),
         });
+      // ...rest unchanged
 
         if (!response.ok) {
           const error = await response.json();
@@ -178,6 +182,26 @@ export default function Operations({ role, token, onOpenDetail }) {
       console.error(err);
     }
   }
+  
+const canDelete = role === "administrator";
+async function deleteInvoice(invId) {
+  if (!window.confirm("Delete this invoice permanently? This cannot be undone.")) return;
+  try {
+    const response = await apiCall(`/api/invoices/${invId}/`, {
+      method: 'DELETE',
+      headers: token ? { Authorization: `Token ${token}` } : {},
+    });
+    if (response.ok || response.status === 204) {
+      await fetchInvoices();
+      setSelected((s) => s.filter((id) => id !== invId));
+    } else {
+      setError('Failed to delete invoice');
+    }
+  } catch (err) {
+    setError('Network error deleting invoice');
+    console.error(err);
+  }
+}
 
   if (loading) return <div style={{ padding: 20 }}>Loading invoices...</div>;
   if (error) return <div style={{ padding: 20, color: 'red' }}>{error}</div>;
@@ -229,7 +253,7 @@ export default function Operations({ role, token, onOpenDetail }) {
                 <th style={{ width: 32 }}>
                   {canGeneratePdf && <input type="checkbox" checked={rows.length > 0 && selected.length === rows.length} onChange={toggleAll} />}
                 </th>
-                <th>Invoice #</th><th>Bidder</th><th>Company</th><th>Lots</th><th>Total amount</th><th>Due date</th><th>Status</th>
+                <th>Invoice #</th><th>Bidder</th><th>Company</th><th>Lots</th><th>Total amount</th><th>Due date</th><th>Status</th><th></th>
               </tr>
             </thead>
             <tbody>
@@ -260,6 +284,14 @@ export default function Operations({ role, token, onOpenDetail }) {
                   <td className="amount">ETB {money(inv.totalAmount.toFixed(2))}</td>
                   <td className="mono">{new Date(inv.dueDate).toLocaleDateString()}</td>
                   <td><StatusCell invoice={inv} role={role} onChangeStatus={changeStatus} /></td>
+                  <td>
+                    {canDelete && (
+                      <button className="btn btn-sm btn-danger" onClick={() => deleteInvoice(inv.id)}>
+                        Delete
+                      </button>
+                    )}
+                  </td>
+                  
                 </tr>
               ))}
             </tbody>

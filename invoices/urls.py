@@ -3,13 +3,13 @@ from rest_framework.routers import DefaultRouter
 
 from .views import (
     AuctionViewSet, WinnerViewSet, InvoiceViewSet,
-    AttachmentDeleteView, AuditLogListView, AuditLogFilterOptionsView, FeeConfigView,LoginView,
+    AttachmentDeleteView, AuditLogListView, AuditLogFilterOptionsView, FeeConfigView, LoginView,
+    OfficeSettingsView,
 )
 
 from .import_views import (
     ImportBatchViewSet, ImportBatchPreviewView, ImportBatchConfirmView,
 )
-
 
 router = DefaultRouter()
 router.register(r'auctions', AuctionViewSet, basename='auction')
@@ -19,7 +19,6 @@ router.register(r'import-batches', ImportBatchViewSet, basename='import-batch')
 
 urlpatterns = [
     path('auth/login/', LoginView.as_view(), name='login'),
-    # Literal paths come BEFORE the router to prevent DRF route collision
     path('import-batches/preview/', ImportBatchPreviewView.as_view(), name='import-batch-preview'),
     path('import-batches/confirm/', ImportBatchConfirmView.as_view(), name='import-batch-confirm'),
 
@@ -27,6 +26,7 @@ urlpatterns = [
     path('audit-logs/', AuditLogListView.as_view(), name='audit-log-list'),
     path('audit-logs/filter-options/', AuditLogFilterOptionsView.as_view(), name='audit-log-filter-options'),
     path('fee-config/', FeeConfigView.as_view(), name='fee-config'),
+    path('office-settings/', OfficeSettingsView.as_view(), name='office-settings'),
 
     path('', include(router.urls)),
 ]

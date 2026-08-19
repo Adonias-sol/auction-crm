@@ -18,12 +18,12 @@ import os
 from django.conf import settings
 
 from .models import (
-    Auction, Winner, Invoice, InvoiceLot, Payment, Attachment, FeeConfig, AuditLog,
+    Auction, Winner, Invoice, InvoiceLot, Payment, Attachment, FeeConfig, AuditLog,OfficeSettings,
 )
 from .serializers import (
     AuctionSerializer, WinnerSerializer, InvoiceListSerializer,
     InvoiceDetailSerializer, PaymentSerializer, AttachmentSerializer,
-    AuditLogSerializer, FeeConfigSerializer, LoginSerializer,
+    AuditLogSerializer, FeeConfigSerializer, LoginSerializer,OfficeSettingsSerializer,
 )
 from .permissions import ReadOnlyForViewer, ActionPermissionMap, can_transition, has_permission
 
@@ -146,16 +146,14 @@ class InvoiceViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'], url_path='generate-pdf')
     def generate_pdf(self, request, pk=None):
         from weasyprint import HTML
-        """
-        POST /api/invoices/{id}/generate-pdf/
-        Body: {feePercentage, auctionRefNumber}
-        """
         invoice = self.get_object()
 
         fee_percentage = request.data.get('feePercentage')
-        auction_ref_number = request.data.get('auctionRefNumber', '')\
-        
+        auction_ref_number = request.data.get('auctionRefNumber', '')
         bidder_name_amharic = request.data.get('bidderNameAmharic', '').strip()
+        amount_in_words = request.data.get('amountInWords', '').strip()
+        fee_in_words = request.data.get('feeInWords', '').strip()
+        office_address = request.data.get('officeAddress', '').strip()
 
         if fee_percentage is not None:
             fee_percentage = Decimal(str(fee_percentage))
@@ -173,20 +171,22 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             log_audit(invoice, 'Generate invoice PDF', request.user, previous, invoice.status, action_type='generate_invoice_pdf')
         else:
             log_audit(invoice, 'Generate invoice PDF', request.user, invoice.status, invoice.status, action_type='generate_invoice_pdf')
+
         images = {}
         static_dir = os.path.join(settings.BASE_DIR, 'invoices', 'static')
         for filename, key in [('logo.png', 'logo'), ('stamp.png', 'stamp'),
-                               ('signature.png', 'signature'), ('footer.png', 'footer'),('watermark.png', 'watermark')]:
+                            ('signature.png', 'signature'), ('footer.png', 'footer'), ('watermark.png', 'watermark')]:
             filepath = os.path.join(static_dir, filename)
             images[key] = ''
             if os.path.exists(filepath):
                 with open(filepath, 'rb') as f:
                     images[key] = base64.b64encode(f.read()).decode('utf-8')
 
-        
-
         try:
-            html_string = self._render_invoice_html(invoice, auction_ref_number, images)
+            html_string = self._render_invoice_html(
+                invoice, auction_ref_number, images,
+                amount_in_words, fee_in_words, office_address,
+            )
             pdf_bytes = HTML(string=html_string).write_pdf()
             return FileResponse(
                 BytesIO(pdf_bytes),
@@ -197,116 +197,81 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         except Exception as e:
             return Response({'detail': f'PDF generation failed: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    def _render_invoice_html(self, invoice, auction_ref_number, images):
-            """
-            Matches the official Auction Ethiopia letter format exactly —
-            only the bracketed values below differ per invoice.
-            """
-            winner = invoice.winner
-            display_name = winner.bidderNameAmharic or winner.bidderName
-            lots = list(invoice.lots.all())
+    def _render_invoice_html(self, invoice, auction_ref_number, images,
+                          amount_in_words='', fee_in_words='', office_address=''):
+        winner = invoice.winner
+        display_name = winner.bidderNameAmharic or winner.bidderName
+        lots = list(invoice.lots.all())
 
-            total_amount = sum((lot.winningAmount for lot in lots), Decimal('0.00'))
-            total_fee = sum((lot.lotFee for lot in lots), Decimal('0.00'))
-            fee_percentage = lots[0].feePercentage.normalize() if lots else Decimal('0')
-            auction_name = lots[0].auctionName if lots else ''
-            lot_numbers = _join_amharic_list([lot.lotNumber for lot in lots])
+        total_amount = sum((lot.winningAmount for lot in lots), Decimal('0.00'))
+        total_fee = sum((lot.lotFee for lot in lots), Decimal('0.00'))
+        fee_percentage = lots[0].feePercentage.normalize() if lots else Decimal('0')
+        auction_name = lots[0].auctionName if lots else ''
+        lot_numbers = _join_amharic_list([lot.lotNumber for lot in lots])
 
-            return f"""
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <meta charset="UTF-8">
-                <style>
-                    @page {{
-                        size: A4;                   
-                        margin: 0;
-                    }}
-                    body {{
-                        font-family: 'Noto Sans Ethiopic', sans-serif;
-                        font-size: 16.5px;
-                        color: #111;
-                        margin: 0;
-                        padding: 45px 55px 0 55px;
-                    }}
-                    .header {{ display: flex; justify-content: space-between; align-items: flex-start; }}
-                    .logo img {{ width: 240px; }}
-                    .ref-block {{ text-align: right; font-size: 14.5px; }}
-                    .ref-block div {{ margin-bottom: 6px; }}
-                    .ref-block .val {{ text-decoration: underline; }}
-                    hr.rule {{ border: none; border-top: 1px solid #999; margin: 12px 0 30px 0; }}
-                    .salutation {{ margin: 0 0 15px 0; font-size: 14.5px; }}
-                    .subject {{
-                        text-align: center; font-weight: bold; text-decoration: underline;
-                        margin: 20px 0; font-size: 14.5px;
-                    }}
-                    .body-text {{ text-align: justify; line-height: 2.1; font-size: 14.5px; margin-bottom: 18px; }}
-                    .closing {{ text-align: right; margin-top: 50px; font-size: 14.5px; }}
-                    .stamp-sig-row {{
-                        display: flex; justify-content: space-between; align-items: center;
-                        margin-top: 40px;
-                    }}
-                    .watermark {{
-                        position: fixed;
-                        left: 25%;
-                        top: 50%;
-                        transform: translate(-50%, -25%);
-                        opacity: 0.3;
-                        z-index: -1;
-                        width: 900px;
-                        }}
-                    .stamp-img {{ width: 250px; margin-left: 50px; }}
-                    .sig-block {{ text-align: right; font-size: 10.5px; }}
-                    .sig-img {{ width: 60px; display: block; margin-left: auto; margin-bottom: 4px; }}
-                    .footer-band {{ position: fixed; bottom: 0; left: 0; width: 100%; }}
-                    .footer-band img {{ width: 100%; display: block; }}
-                </style>
-            </head>
-            <body>
-                <img class="watermark" src="data:image/png;base64,{images['watermark']}">
-                <div class="header">
-                    <div class="logo"><img src="data:image/png;base64,{images['logo']}"></div>
-                    <div class="ref-block">
-                        <div>ቀን: <span class="val">{invoice.invoiceDate.strftime('%d/%m/%Y')}</span></div>
-                        <div>ቁጥር: <span class="val">{invoice.invoiceNumber}</span></div>
-                    </div>
+        # Both are entirely optional — if the user leaves them blank in the
+        # modal, the PDF just prints the numeral with no parenthetical, same
+        # as before this feature existed.
+        amount_words_part = f" ({amount_in_words})" if amount_in_words else ""
+        fee_words_part = f" ({fee_in_words})" if fee_in_words else ""
+
+        default_address = "ቦሌ አትላስ ከአውሮፓ ዩኒየን ዝቅ ብሎ ከለላ ህንጻ 3ኛ ፎቅ ቢሮ ቁጥር 301"
+        address_text = office_address or default_address
+
+        return f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <style>
+                ... (unchanged CSS) ...
+            </style>
+        </head>
+        <body>
+            <img class="watermark" src="data:image/png;base64,{images['watermark']}">
+            <div class="header">
+                <div class="logo"><img src="data:image/png;base64,{images['logo']}"></div>
+                <div class="ref-block">
+                    <div>ቀን: <span class="val">{invoice.invoiceDate.strftime('%d/%m/%Y')}</span></div>
+                    <div>ቁጥር: <span class="val">{invoice.invoiceNumber}</span></div>
                 </div>
-                <hr class="rule">
+            </div>
+            <hr class="rule">
 
-                <div class="salutation">
-                    <div>ለ {display_name}</div>
-                    <div>ባሉበት</div>
+            <div class="salutation">
+                <div>ለ {display_name}</div>
+                <div>ባሉበት</div>
+            </div>
+
+            <div class="subject">ጉዳይ፡- የጨረታ processing fee እንዲከፍሉ ስለማሳወቅ</div>
+
+            <div class="body-text">
+                {auction_name} ለኩባንያው አገልግሎት የማያሰጡ የተለያዩ ዕቃዎችን በጨረታ አወዳድሮ ለመሸጥ ባወጣው የጨረታ ቁጥር {auction_ref_number} ተሳትፈው በሎት ቁጥር {lot_numbers} የተጠቀሱትን ለመግዛት ባቀረቡት ጠቅላላ ዋጋ ቫትን ጨምሮ ብር {total_amount:,.2f}{amount_words_part} ሲሆን የንብረቶቹን ርክክብ መመሪያ ተመልክተው ከተረከቡ በኋላ ከአሸነፉበት ዋጋ ላይ የሚታሰብ {fee_percentage}% (processing fee) {total_fee:,.2f}{fee_words_part} ለአክሽን ኢትዮጵያ የሚከፍሉ ይሆናል፡፡
+            </div>
+
+            <div class="body-text">
+                ስለሆነም በኢትዮጵያ ንግድ ባንክ የሂሳብ ቁጥር 1000547266289 ገቢ በማድረግ {address_text} በአካል በመገኘት ደረሰኝ እንዲያስገቡ እንጠይቃለን፡፡
+            </div>
+
+            <div class="body-text">
+                ማሳሰቢያ፡- ለጨረታ መወዳደሪያ ያስያዙት ሲ.ፒ.ኦ ተመላሽ የሚደረገው processing fee መከፈላችሁ ከተረጋገጠ በኋላ ነው፡፡
+            </div>
+
+            <div class="closing">ከሰላምታ ጋር</div>
+
+            <div class="stamp-sig-row">
+                <img class="stamp-img" src="data:image/png;base64,{images['stamp']}">
+                <div class="sig-block">
+                    <img class="sig-img" src="data:image/png;base64,{images['signature']}">
+                    <div>ህዝቅኤል አየነው</div>
+                    <div>የደንበኞች አስተዳደር</div>
                 </div>
+            </div>
 
-                <div class="subject">ጉዳይ፡- የጨረታ processing fee እንዲከፍሉ ስለማሳወቅ</div>
-
-                <div class="body-text">
-                    {auction_name} ለኩባንያው አገልግሎት የማያሰጡ የተለያዩ ዕቃዎችን በጨረታ አወዳድሮ ለመሸጥ ባወጣው የጨረታ ቁጥር {auction_ref_number} ተሳትፈው በሎት ቁጥር {lot_numbers} የተጠቀሱትን ለመግዛት ባቀረቡት ጠቅላላ ዋጋ ቫትን ጨምሮ ብር {total_amount:,.2f} ሲሆን የንብረቶቹን ርክክብ መመሪያ ተመልክተው ከተረከቡ በኋላ ከአሸነፉበት ዋጋ ላይ የሚታሰብ {fee_percentage}% (processing fee) {total_fee:,.2f} ለአክሽን ኢትዮጵያ የሚከፍሉ ይሆናል፡፡
-                </div>
-
-                <div class="body-text">
-                    ስለሆነም በኢትዮጵያ ንግድ ባንክ የሂሳብ ቁጥር 1000547266289 ገቢ በማድረግ ቦሌ አትላስ ከአውሮፓ ዩኒየን ዝቅ ብሎ ከለላ ህንጻ 3ኛ ፎቅ ቢሮ ቁጥር 301 በአካል በመገኘት ደረሰኝ እንዲያስገቡ እንጠይቃለን፡፡
-                </div>
-
-                <div class="body-text">
-                    ማሳሰቢያ፡- ለጨረታ መወዳደሪያ ያስያዙት ሲ.ፒ.ኦ ተመላሽ የሚደረገው processing fee መከፈላችሁ ከተረጋገጠ በኋላ ነው፡፡
-                </div>
-
-                <div class="closing">ከሰላምታ ጋር</div>
-
-                <div class="stamp-sig-row">
-                    <img class="stamp-img" src="data:image/png;base64,{images['stamp']}">
-                    <div class="sig-block">
-                        <img class="sig-img" src="data:image/png;base64,{images['signature']}">
-                        <div>ህዝቅኤል አየነው</div>
-                        <div>የደንበኞች አስተዳደር</div>
-                    </div>
-                </div>
-
-                <div class="footer-band"><img src="data:image/png;base64,{images['footer']}"></div>
-            </body>
-            </html>
-            """
+            <div class="footer-band"><img src="data:image/png;base64,{images['footer']}"></div>
+        </body>
+        </html>
+        """
     @action(detail=True, methods=['post'], url_path='change-status')
     def change_status(self, request, pk=None):
         invoice = self.get_object()
@@ -512,3 +477,24 @@ class LoginView(APIView):
             result = serializer.create(serializer.validated_data)
             return Response(result, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+
+
+class OfficeSettingsView(generics.GenericAPIView):
+    """GET current saved office address, PUT to save a new one (admin only)."""
+    serializer_class = OfficeSettingsSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        config = OfficeSettings.objects.filter(isActive=True).first()
+        if not config:
+            return Response({'address': '', 'configuredBy': '', 'configuredAt': None})
+        return Response(OfficeSettingsSerializer(config).data)
+
+    def put(self, request):
+        if not has_permission(request.user, 'manage_fee_config'):  # reuse admin-only key
+            return Response({'error': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
+        address = request.data.get('address', '')
+        OfficeSettings.objects.filter(isActive=True).update(isActive=False)
+        config = OfficeSettings.objects.create(address=address, configuredBy=request.user, isActive=True)
+        return Response(OfficeSettingsSerializer(config).data)

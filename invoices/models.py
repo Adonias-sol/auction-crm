@@ -87,6 +87,19 @@ class FeeConfig(models.Model):
     def get_active_percentage(cls):
         active = cls.objects.filter(is_active=True).first()
         return active.percentage if active else Decimal('0.95')
+    
+class OfficeSettings(models.Model):
+    """Reusable Amharic office address printed/attached to invoices. Same
+    single-active-row + history pattern as FeeConfig."""
+    address = models.TextField(blank=True, default='')
+    configuredBy = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True
+    )
+    configuredAt = models.DateTimeField(auto_now=True)
+    isActive = models.BooleanField(default=True)
+
+    def __str__(self):
+        return f"Office address ({'active' if self.isActive else 'inactive'})"
 
 
 class Auction(models.Model):

@@ -341,17 +341,15 @@ function exportRecords() {
             onClick={deleteSelected}
             disabled={selected.length === 0}
             title="Delete selected invoices"
+            aria-label="Delete selected invoices"
           >
             <svg
               className="btn-icon"
               viewBox="0 0 24 24"
-              width="18"
-              height="18"
               fill="currentColor"
             >
               <path d="M16 9v10H8V9h8m-1.5-6h-5l-1 1H5v2h14V4h-3.5l-1-1zM9 16h2v-7H9v7zm4 0h2v-7h-2v7z" />
             </svg>
-            {selected.length > 0 ? `Delete (${selected.length})` : "Delete"}
           </button>
         )}
       </div>

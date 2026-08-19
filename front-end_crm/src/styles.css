@@ -118,36 +118,38 @@ a{color:inherit;}
 .card.locked, .section.locked{opacity:0.4;pointer-events:none;}
 
 .btn-delete {
-  width: 36px;
-  height: 36px;
-  padding: 0;
-  display: flex;
+  width: 34px !important;
+  min-width: 34px !important;
+  height: 34px;
+  padding: 0 !important;
+  margin: 0;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
+  box-sizing: border-box;
 }
 
-.btn-icon {
+.btn-delete .btn-icon {
   width: 16px;
   height: 16px;
+  display: block;
   flex-shrink: 0;
 }
+
 .btn-danger {
-  background: var(--red-bg);
+  background: transparent;
   color: var(--red);
-  border: 1px solid var(--red);
+  border: none;
   border-radius: 6px;
-  cursor: pointer;
-  font-weight: 500;
-  transition: all 0.2s ease;
 }
 
 .btn-danger:hover:not(:disabled) {
-  background: var(--red);
-  color: white;
+  background: var(--red-bg);
+  color: var(--red);
 }
 
 .btn-danger:disabled {
-  opacity: 0.5;
+  opacity: 0.35;
   cursor: not-allowed;
 }
 

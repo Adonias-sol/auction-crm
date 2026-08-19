@@ -110,9 +110,7 @@ export default function App() {
       />
       <div className="main">
         <div className="page active">
-          {page === "dashboard" && (
-            <Dashboard token={session.token} />
-          )}
+          
           {page === "import" && (
             <ImportBatches
               role={session.role}

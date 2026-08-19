@@ -197,8 +197,11 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         except Exception as e:
             return Response({'detail': f'PDF generation failed: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    def _render_invoice_html(self, invoice, auction_ref_number, images,
-                          amount_in_words='', fee_in_words='', office_address=''):
+    def _render_invoice_html(self, invoice, auction_ref_number, images,amount_in_words='', fee_in_words='', office_address=''):
+        """
+        Matches the official Auction Ethiopia letter format exactly —
+        only the bracketed values below differ per invoice.
+        """
         winner = invoice.winner
         display_name = winner.bidderNameAmharic or winner.bidderName
         lots = list(invoice.lots.all())
@@ -209,9 +212,6 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         auction_name = lots[0].auctionName if lots else ''
         lot_numbers = _join_amharic_list([lot.lotNumber for lot in lots])
 
-        # Both are entirely optional — if the user leaves them blank in the
-        # modal, the PDF just prints the numeral with no parenthetical, same
-        # as before this feature existed.
         amount_words_part = f" ({amount_in_words})" if amount_in_words else ""
         fee_words_part = f" ({fee_in_words})" if fee_in_words else ""
 
@@ -224,7 +224,48 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         <head>
             <meta charset="UTF-8">
             <style>
-                ... (unchanged CSS) ...
+                @page {{
+                    size: A4;
+                    margin: 0;
+                }}
+                body {{
+                    font-family: 'Noto Sans Ethiopic', sans-serif;
+                    font-size: 16.5px;
+                    color: #111;
+                    margin: 0;
+                    padding: 45px 55px 0 55px;
+                }}
+                .header {{ display: flex; justify-content: space-between; align-items: flex-start; }}
+                .logo img {{ width: 240px; }}
+                .ref-block {{ text-align: right; font-size: 14.5px; }}
+                .ref-block div {{ margin-bottom: 6px; }}
+                .ref-block .val {{ text-decoration: underline; }}
+                hr.rule {{ border: none; border-top: 1px solid #999; margin: 12px 0 30px 0; }}
+                .salutation {{ margin: 0 0 15px 0; font-size: 14.5px; }}
+                .subject {{
+                    text-align: center; font-weight: bold; text-decoration: underline;
+                    margin: 20px 0; font-size: 14.5px;
+                }}
+                .body-text {{ text-align: justify; line-height: 2.1; font-size: 14.5px; margin-bottom: 18px; }}
+                .closing {{ text-align: right; margin-top: 50px; font-size: 14.5px; }}
+                .stamp-sig-row {{
+                    display: flex; justify-content: space-between; align-items: center;
+                    margin-top: 40px;
+                }}
+                .watermark {{
+                    position: fixed;
+                    left: 25%;
+                    top: 50%;
+                    transform: translate(-50%, -25%);
+                    opacity: 0.3;
+                    z-index: -1;
+                    width: 900px;
+                }}
+                .stamp-img {{ width: 250px; margin-left: 50px; }}
+                .sig-block {{ text-align: right; font-size: 10.5px; }}
+                .sig-img {{ width: 60px; display: block; margin-left: auto; margin-bottom: 4px; }}
+                .footer-band {{ position: fixed; bottom: 0; left: 0; width: 100%; }}
+                .footer-band img {{ width: 100%; display: block; }}
             </style>
         </head>
         <body>

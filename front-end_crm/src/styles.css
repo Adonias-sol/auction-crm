@@ -108,10 +108,11 @@ a{color:inherit;}
 .btn-ghost{background:transparent;}
 .btn-danger{background:var(--red-bg);color:var(--red);border-color:var(--red);}
 .btn-sm{padding:5px 10px;font-size:12px;}
-.btn-blue{background:var(--blue-bg);color:var(--blue);border-color:var(--blue);}
-.btn-blue:hover{background:var(--blue);color:#fff;}
-.btn-amber{background:var(--amber-bg);color:var(--amber);border-color:var(--amber);}
-.btn-amber:hover{background:var(--amber);color:#fff;}
+
+.btn-blue{background:var(--blue);color:#fff;border-color:var(--blue);}
+.btn-blue:hover{opacity:0.85;}
+.btn-amber{background:var(--amber);color:#fff;border-color:var(--amber);}
+.btn-amber:hover{opacity:0.85;}
 .btn[disabled], .btn.locked{opacity:0.35;cursor:not-allowed;pointer-events:none;}
 .card.locked, .section.locked{opacity:0.4;pointer-events:none;}
 
@@ -188,6 +189,24 @@ tr:hover td{background:#F9F9F7;}
 .period-dropdown{font-family:'Inter';font-size:12px;padding:4px 8px;border:1px solid var(--border);border-radius:5px;background:var(--panel);color:var(--text);cursor:pointer;}
 
 .status-select{font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:11px;padding:4px 6px;border-radius:3px;border:1.5px solid var(--border);background:var(--panel);color:var(--text);}
+
+.status-btn{
+  font-family:'IBM Plex Mono',monospace;
+  font-weight:600;
+  font-size:12px;
+  padding:7px 14px;
+  border-radius:5px;
+  border:1.5px solid currentColor;
+  cursor:pointer;
+  text-transform:capitalize;
+}
+.status-btn:hover{filter:brightness(0.93);}
+.status-btn.pending_payment{color:var(--amber);background:var(--amber-bg);}
+.status-btn.under_verification{color:var(--blue);background:var(--blue-bg);}
+.status-btn.paid{color:var(--green);background:var(--green-bg);}
+.status-btn.overdue{color:var(--red);background:var(--red-bg);}
+.status-btn.cancelled,
+.status-btn.waived{color:var(--gray);background:var(--gray-bg);}
 
 table{min-width:640px;}
 

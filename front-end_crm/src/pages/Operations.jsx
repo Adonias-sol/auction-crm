@@ -323,7 +323,7 @@ function exportRecords() {
             disabled={selected.length === 0}
             title="Delete selected invoices"
           >
-            🗑 Delete{selected.length > 0 ? ` (${selected.length})` : ""}
+            🗑{selected.length > 0 ? ` (${selected.length})` : ""}
           </button>
         )}
       </div>
@@ -406,7 +406,7 @@ function exportRecords() {
               </div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                 {["pending_payment", "under_verification", "paid", "overdue", "cancelled", "waived"].map((s) => (
-                  <button key={s} className="btn btn-sm" onClick={() => confirmBulkUpdate(s)}>
+                  <button key={s} className={`status-btn ${s}`} onClick={() => confirmBulkUpdate(s)}>
                     {s.replace(/_/g, " ")}
                   </button>
                 ))}

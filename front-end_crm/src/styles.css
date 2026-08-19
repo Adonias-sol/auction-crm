@@ -137,7 +137,7 @@ a{color:inherit;}
 }
 
 .btn-danger {
-  background:var(--red);
+  background: transparent;  
   color: red;
   border: 1px solid var(--red);
   border-radius: 6px;

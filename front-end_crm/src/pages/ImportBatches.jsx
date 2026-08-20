@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { money } from "../data";
 import { apiCall } from "../api";
 
@@ -12,6 +12,7 @@ export default function ImportBatches({ role, token }) {
   const [batches, setBatches] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     fetchBatches();
@@ -125,9 +126,12 @@ export default function ImportBatches({ role, token }) {
                 e.preventDefault();
                 setFile(e.dataTransfer.files[0]);
               }}
+              onClick={() => fileInputRef.current?.click()}
+              style={{ cursor: 'pointer' }}
             >
               {file ? file.name : "bid_data_report.xlsx — drag file here or click to browse"}
               <input 
+                ref={fileInputRef}
                 type="file" 
                 accept=".xlsx" 
                 onChange={(e) => setFile(e.target.files?.[0])}

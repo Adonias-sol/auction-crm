@@ -291,11 +291,6 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             <div class="closing">ከሰላምታ ጋር</div>
             <div class="stamp-sig-row">
                 <img class="stamp-img" src="data:image/png;base64,{images['stamp']}">
-                <div class="sig-block">
-                    <img class="sig-img" src="data:image/png;base64,{images['signature']}">
-                    <div>ህዝቅኤል አየነው</div>
-                    <div>የደንበኞች አስተዳደር</div>
-                </div>
             </div>
             <div class="footer-band"><img src="data:image/png;base64,{images['footer']}"></div>
         </body>

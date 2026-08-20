@@ -266,15 +266,18 @@ class ImportBatchConfirmView(APIView):
                 )
 
                 for lot in lots:
+                    raw_initial = lot.get('initialPrice')
+                    raw_cpo = lot.get('cpoAmount')
+                    raw_fee_pct = group.get('feePercentage', lot.get('feePercentage'))
                     InvoiceLot.objects.create(
                         invoice=invoice,
                         lotNumber=lot['lotNumber'],
                         auctionName=lot['auctionName'],
-                        initialPrice=lot.get('initialPrice') or None,
-                        winningAmount=lot['winningAmount'],
-                        cpoAmount=lot.get('cpoAmount') or None,
+                        initialPrice=Decimal(raw_initial) if raw_initial else None,
+                        winningAmount=Decimal(lot['winningAmount']),
+                        cpoAmount=Decimal(raw_cpo) if raw_cpo else None,
                         cpoBank=lot.get('cpoBank', ''),
-                        feePercentage=group.get('feePercentage', lot.get('feePercentage')),
+                        feePercentage=Decimal(raw_fee_pct),
                         submittedAt=parse_submitted_at(lot.get('submittedAt')),
                         # lotFee isn't passed — InvoiceLot.save() computes it.
                     )

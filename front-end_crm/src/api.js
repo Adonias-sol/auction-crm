@@ -3,15 +3,17 @@ export const API_BASE =
 
 export function apiCall(endpoint, options = {}) {
   const token = sessionStorage.getItem('authToken');
+  const isFormData = options.body instanceof FormData;
+
   const headers = {
-    'Content-Type': 'application/json',
+    ...(!isFormData && { 'Content-Type': 'application/json' }),
     ...options.headers,
   };
-  
+
   if (token) {
     headers.Authorization = `Token ${token}`;
   }
-  
+
   return fetch(`${API_BASE}${endpoint}`, {
     ...options,
     headers,

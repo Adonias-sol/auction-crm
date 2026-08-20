@@ -74,24 +74,22 @@ export default function ImportBatches({ role, token }) {
   async function confirmImport() {
     setLoading(true);
     setError("");
-
     try {
       const response = await apiCall('/api/import-batches/confirm/', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Token ${token}` } : {}),
-        },
         body: JSON.stringify({
-          batchName: batchName || null,
+          fileName: file?.name || '',
+          batchName: batchName || '',
           companyName: company,
           auctionDate: date,
+          groupedWinners: preview.groupedWinners,
+          invalidRecords: preview.flaggedCount || 0,
         }),
       });
 
       if (!response.ok) {
         const err = await response.json();
-        setError(err.detail || 'Confirm failed');
+        setError(err.error || err.detail || 'Confirm failed');
         setLoading(false);
         return;
       }
@@ -108,7 +106,7 @@ export default function ImportBatches({ role, token }) {
     } finally {
       setLoading(false);
     }
-  }
+}
 
   return (
     <div>
@@ -154,19 +152,20 @@ export default function ImportBatches({ role, token }) {
         <div className="card" style={{ marginBottom: 18 }}>
           <h3 style={{ margin: "0 0 4px" }}>Preview — nothing saved yet</h3>
           <div style={{ fontSize: 12.5, color: "var(--text-2)", marginBottom: 14 }}>
-            {preview.summary || `${preview.winners?.length || 0} winners · ${preview.lots?.length || 0} lots found`}
+            {preview.totalWinners || 0} winners · {preview.totalLots || 0} lots found
+            {preview.flaggedCount > 0 && ` · ${preview.flaggedCount} row(s) flagged and skipped`}
           </div>
           <div className="tbl-wrap" style={{ marginBottom: 14 }}>
             <table>
               <thead><tr><th>Bidder</th><th>Phone</th><th>Lots</th><th>Total fee</th><th>Fee %</th></tr></thead>
               <tbody>
-                {(preview.winners || []).map((w, i) => (
+                {(preview.groupedWinners || []).map((w, i) => (
                   <tr key={i}>
                     <td>{w.bidderName}</td>
                     <td className="mono">{w.winnerPhone}</td>
-                    <td className="mono">{w.lots?.length || 1}</td>
-                    <td className="amount">ETB {money((w.totalFee || 0).toFixed(2))}</td>
-                    <td className="mono">{(w.feePercentage || 0.95).toFixed(2)}%</td>
+                    <td className="mono">{w.lots?.length || 0}</td>
+                    <td className="amount">{money(parseFloat(w.totalFee || 0).toFixed(2))}</td>
+                    <td className="mono">{parseFloat(w.feePercentage || 0.95).toFixed(2)}%</td>
                   </tr>
                 ))}
               </tbody>

@@ -240,10 +240,11 @@ class ImportBatchConfirmView(APIView):
                 total_winning = sum(Decimal(l['winningAmount']) for l in lots)
                 total_cpo = sum((Decimal(l['cpoAmount']) if l.get('cpoAmount') else Decimal('0')) for l in lots)
                 total_initial = sum((Decimal(l['initialPrice']) if l.get('initialPrice') else Decimal('0')) for l in lots)
-                earliest_submitted = min(
-                    (parse_submitted_at(l['submittedAt']) for l in lots if l.get('submittedAt')),
-                    default=None,
-                )
+                parsed_submitted_dates = [
+                    d for d in (parse_submitted_at(l.get('submittedAt')) for l in lots)
+                    if d is not None
+                ]
+                earliest_submitted = min(parsed_submitted_dates, default=None)
 
                 winner = Winner.objects.create(
                     bidderName=group['bidderName'],

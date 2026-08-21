@@ -100,6 +100,8 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(instance)
         return Response(serializer.data)
 
+    from datetime import timedelta
+
     @action(detail=False, methods=['get'])
     def summary(self, request):
         if not has_permission(request.user, 'view_dashboard'):
@@ -107,6 +109,7 @@ class InvoiceViewSet(viewsets.ModelViewSet):
 
         today = timezone.localdate()
         month_start = today.replace(day=1)
+        week_start = today - timedelta(days=today.weekday())
 
         status_keys = [
             'invoice_generated', 'pending_payment', 'payment_submitted',
@@ -116,14 +119,55 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         for row in Invoice.objects.values('status').annotate(n=Count('id')):
             counts[row['status']] = row['n']
 
+        # --- Ground truth is Invoice.status, not Payment rows ---
+        paid_lots = InvoiceLot.objects.filter(invoice__status='paid')
+        total_collected = paid_lots.aggregate(t=Sum('lotFee'))['t'] or 0
+        paid_auction_count = paid_lots.exclude(auctionName='').values('auctionName').distinct().count()
+
         total_due = InvoiceLot.objects.aggregate(t=Sum('lotFee'))['t'] or 0
-        verified_payments = Payment.objects.filter(paymentStatus='verified')
-        total_collected = verified_payments.aggregate(t=Sum('amountPaid'))['t'] or 0
-        outstanding = total_due - total_collected
+
+        unpaid_statuses = ['invoice_generated', 'pending_payment', 'payment_submitted', 'under_verification', 'overdue']
+        outstanding = (
+            InvoiceLot.objects.filter(invoice__status__in=unpaid_statuses)
+            .aggregate(t=Sum('lotFee'))['t'] or 0
+        )
+        outstanding_count = Invoice.objects.filter(status__in=unpaid_statuses).count()
+
         collection_pct = (total_collected / total_due * 100) if total_due else 0
 
-        today_collected = verified_payments.filter(verifiedDate__date=today).aggregate(t=Sum('amountPaid'))['t'] or 0
-        month_collected = verified_payments.filter(verifiedDate__date__gte=month_start).aggregate(t=Sum('amountPaid'))['t'] or 0
+        def received_since(start_date):
+            invoice_ids = (
+                Payment.objects.filter(paymentStatus='verified', verifiedDate__date__gte=start_date)
+                .values_list('invoice_id', flat=True).distinct()
+            )
+            return InvoiceLot.objects.filter(invoice_id__in=invoice_ids).aggregate(t=Sum('lotFee'))['t'] or 0
+
+        today_collected = received_since(today)
+        week_collected = received_since(week_start)
+        month_collected = received_since(month_start)
+
+        revenue_by_auction = [
+            {'auctionName': r['auctionName'], 'total': str(r['total']), 'count': r['count']}
+            for r in (
+                paid_lots.exclude(auctionName='')
+                .values('auctionName')
+                .annotate(total=Sum('lotFee'), count=Count('id'))
+                .order_by('-total')[:10]
+            )
+        ]
+
+        revenue_by_client = [
+            {
+                'clientName': r['invoice__winner__companyName'] or r['invoice__winner__bidderName'],
+                'total': str(r['total']),
+                'count': r['count'],
+            }
+            for r in (
+                paid_lots.values('invoice__winner__companyName', 'invoice__winner__bidderName')
+                .annotate(total=Sum('lotFee'), count=Count('id'))
+                .order_by('-total')[:10]
+            )
+        ]
 
         return Response({
             'totalInvoices': Invoice.objects.count(),
@@ -131,6 +175,8 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             'totalCollected': str(total_collected),
             'totalOutstanding': str(outstanding),
             'collectionPercentage': f"{collection_pct:.2f}",
+            'paidAuctionCount': paid_auction_count,
+            'outstandingCount': outstanding_count,
             'invoiceGeneratedCount': counts['invoice_generated'],
             'pendingPaymentCount': counts['pending_payment'],
             'paymentSubmittedCount': counts['payment_submitted'],
@@ -140,7 +186,10 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             'cancelledCount': counts['cancelled'],
             'waivedCount': counts['waived'],
             'paymentsReceivedToday': str(today_collected),
+            'paymentsReceivedThisWeek': str(week_collected),
             'paymentsReceivedThisMonth': str(month_collected),
+            'revenueByAuction': revenue_by_auction,
+            'revenueByClient': revenue_by_client,
         })
 
     @action(detail=True, methods=['post'], url_path='generate-pdf')

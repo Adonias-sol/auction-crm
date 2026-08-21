@@ -133,7 +133,7 @@ export default function ImportBatches({ role, token }) {
     if (res.ok) await fetchBatches();
     else setError('Failed to delete batch');
   } catch {
-    setError('Network error deleting batch');
+    setError('Network error deleting batch'); 
   }
 }
 
@@ -189,7 +189,7 @@ export default function ImportBatches({ role, token }) {
           </div>
           <div className="tbl-wrap" style={{ marginBottom: 14 }}>
             <table>
-              <thead><tr><th>Bidder</th><th>Phone</th><th>Lots</th><th>Total fee</th><th>Fee %</th><th>Actions</th></tr></thead>
+              <thead><tr><th>Bidder</th><th>Phone</th><th>Lots</th><th>Total fee</th><th>Fee %</th></tr></thead>
               <tbody>
                 {(preview.groupedWinners || []).map((w, i) => (
                   <tr key={i}>
@@ -198,11 +198,6 @@ export default function ImportBatches({ role, token }) {
                     <td className="mono">{w.lots?.length || 0}</td>
                     <td className="amount">{money(parseFloat(w.totalFee || 0).toFixed(2))}</td>
                     <td className="mono">{parseFloat(w.feePercentage || 0.95).toFixed(2)}%</td>
-                    <td>
-                      {role === "administrator" && (
-                        <button className="btn btn-sm btn-danger" onClick={() => deleteBatch(b.id)}>Delete</button>
-                      )}
-                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -225,7 +220,7 @@ export default function ImportBatches({ role, token }) {
       <div className="tbl-wrap">
         <div style={{ overflowX: "auto" }}>
           <table>
-            <thead><tr><th>Batch</th><th>Company</th><th>Auction date</th><th>Uploaded</th><th>Records</th><th>Status</th><th>Imported by</th></tr></thead>
+            <thead><tr><th>Batch</th><th>Company</th><th>Auction date</th><th>Uploaded</th><th>Records</th><th>Status</th><th>Imported by</th><th>Actions</th></tr></thead>
             <tbody>
               {batches.map((b) => (
                 <tr key={b.id}>
@@ -239,13 +234,18 @@ export default function ImportBatches({ role, token }) {
                   <td className="mono">{b.validRecords}/{b.totalRecords}</td>
                   <td><span className="stamp paid" style={{ transform: "none" }}>{b.status}</span></td>
                   <td>{b.importedBy}</td>
+                  <td>
+                      {role === "administrator" && (
+                        <button className="btn btn-sm btn-danger" onClick={() => deleteBatch(b.id)}>Delete</button>
+                      )}
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       </div>
-      
+
       {viewingBatch && (
         <div className="overlay active" onClick={(e) => { if (e.target === e.currentTarget) setViewingBatch(null); }}>
           <div className="modal">

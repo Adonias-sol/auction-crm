@@ -79,8 +79,8 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             qs = qs.filter(winner__bidderName__icontains=p['bidderName'])
         if p.get('phoneNumber'):
             qs = qs.filter(winner__winnerPhone__icontains=p['phoneNumber'])
-        if p.get('companyName'):
-            qs = qs.filter(winner__companyName__icontains=p['companyName'])
+        if p.get('auctionCompany'):
+            qs = qs.filter(importBatch__companyName__icontains=p['auctionCompany'])
         if p.get('lotNo'):
             qs = qs.filter(lots__lotNumber__icontains=p['lotNo']).distinct()
         if p.get('dateFrom'):

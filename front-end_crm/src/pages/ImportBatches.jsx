@@ -13,11 +13,28 @@ export default function ImportBatches({ role, token }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const fileInputRef = useRef(null);
+  const [dueDate, setDueDate] = useState(() => {
+  const d = new Date();
+  d.setDate(d.getDate() + 14);
+  return d.toISOString().slice(0, 10);
+});
+  const [viewingBatch, setViewingBatch] = useState(null);
+  const [batchInvoices, setBatchInvoices] = useState([]);
+
+  
 
   useEffect(() => {
     fetchBatches();
   }, [token]);
 
+  async function openBatchDetail(b) {
+    setViewingBatch(b);
+    const res = await apiCall(`/api/import-batches/${b.id}/invoices/`);
+    if (res.ok) {
+      const data = await res.json();
+      setBatchInvoices(data.results || data);
+    }
+  }
   async function fetchBatches() {
     try {
       const response = await apiCall('/api/import-batches/', {
@@ -85,6 +102,7 @@ export default function ImportBatches({ role, token }) {
           auctionDate: date,
           groupedWinners: preview.groupedWinners,
           invalidRecords: preview.flaggedCount || 0,
+          dueDate,
         }),
       });
 
@@ -107,6 +125,16 @@ export default function ImportBatches({ role, token }) {
     } finally {
       setLoading(false);
     }
+}
+  async function deleteBatch(id) {
+  if (!window.confirm("Delete this batch and all invoices generated from it? This cannot be undone.")) return;
+  try {
+    const res = await apiCall(`/api/import-batches/${id}/`, { method: 'DELETE' });
+    if (res.ok) await fetchBatches();
+    else setError('Failed to delete batch');
+  } catch {
+    setError('Network error deleting batch');
+  }
 }
 
   return (
@@ -161,7 +189,7 @@ export default function ImportBatches({ role, token }) {
           </div>
           <div className="tbl-wrap" style={{ marginBottom: 14 }}>
             <table>
-              <thead><tr><th>Bidder</th><th>Phone</th><th>Lots</th><th>Total fee</th><th>Fee %</th></tr></thead>
+              <thead><tr><th>Bidder</th><th>Phone</th><th>Lots</th><th>Total fee</th><th>Fee %</th><th>Actions</th></tr></thead>
               <tbody>
                 {(preview.groupedWinners || []).map((w, i) => (
                   <tr key={i}>
@@ -170,12 +198,21 @@ export default function ImportBatches({ role, token }) {
                     <td className="mono">{w.lots?.length || 0}</td>
                     <td className="amount">{money(parseFloat(w.totalFee || 0).toFixed(2))}</td>
                     <td className="mono">{parseFloat(w.feePercentage || 0.95).toFixed(2)}%</td>
+                    <td>
+                      {role === "administrator" && (
+                        <button className="btn btn-sm btn-danger" onClick={() => deleteBatch(b.id)}>Delete</button>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
           <div className="locked-note" style={{ marginBottom: 14 }}>Fee % is editable per winner before confirming — click a row to adjust.</div>
+          <div className="field" style={{ maxWidth: 220, marginBottom: 14 }}>
+          <div className="fl">Due date <span className="opt">(defaults to +14 days)</span></div>
+          <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+        </div>
           <div style={{ display: "flex", gap: 8 }}>
             <button className="btn btn-brass" onClick={confirmImport} disabled={loading}>
               {loading ? 'Confirming...' : 'Confirm & create invoices'}
@@ -192,7 +229,10 @@ export default function ImportBatches({ role, token }) {
             <tbody>
               {batches.map((b) => (
                 <tr key={b.id}>
-                  <td>{b.batchName || <span style={{ color: "var(--text-3)" }}>—</span>}<div style={{ fontSize: 11, color: "var(--text-3)" }} className="mono">{b.fileName}</div></td>
+                  <td onClick={() => openBatchDetail(b)} style={{ cursor: "pointer" }}>
+                    {b.batchName || <span style={{ color: "var(--text-3)" }}>—</span>}
+                    <div style={{ fontSize: 11, color: "var(--text-3)" }} className="mono">{b.fileName}</div>
+                  </td>
                   <td>{b.companyName}</td>
                   <td className="mono">{new Date(b.auctionDate).toLocaleDateString()}</td>
                   <td className="mono">{new Date(b.uploadDate).toLocaleDateString()}</td>
@@ -205,6 +245,34 @@ export default function ImportBatches({ role, token }) {
           </table>
         </div>
       </div>
+      
+      {viewingBatch && (
+        <div className="overlay active" onClick={(e) => { if (e.target === e.currentTarget) setViewingBatch(null); }}>
+          <div className="modal">
+            <div className="modal-head">
+              <h3 style={{ margin: 0 }}>{viewingBatch.batchName || viewingBatch.companyName}</h3>
+              <button className="modal-close" onClick={() => setViewingBatch(null)}>&times;</button>
+            </div>
+            <div className="modal-body">
+              <div className="tbl-wrap">
+                <table>
+                  <thead><tr><th>Invoice #</th><th>Bidder</th><th>Total</th><th>Status</th></tr></thead>
+                  <tbody>
+                    {batchInvoices.map((inv) => (
+                      <tr key={inv.id}>
+                        <td className="mono">{inv.invoiceNumber}</td>
+                        <td>{inv.bidderName}</td>
+                        <td className="amount">{money(inv.totalAmount.toFixed(2))}</td>
+                        <td><span className={`stamp ${inv.status}`}>{inv.status}</span></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -138,6 +138,9 @@ class InvoiceWinnerFieldsMixin:
 
     def get_companyName(self, obj):
         return obj.winner.companyName
+    
+    def get_auctionCompany(self, obj):
+        return obj.importBatch.companyName if obj.importBatch else ''
 
     def get_winnerPhone(self, obj):
         return obj.winner.winnerPhone
@@ -151,6 +154,7 @@ class InvoiceListSerializer(InvoiceWinnerFieldsMixin, serializers.ModelSerialize
     totalAmount = serializers.ReadOnlyField()
     bidderName = serializers.SerializerMethodField()
     companyName = serializers.SerializerMethodField()
+    auctionCompany = serializers.SerializerMethodField()
     winnerPhone = serializers.SerializerMethodField()
 
     class Meta:
@@ -158,7 +162,7 @@ class InvoiceListSerializer(InvoiceWinnerFieldsMixin, serializers.ModelSerialize
         fields = [
             'id', 'invoiceNumber', 'invoiceDate', 'dueDate', 'winner',
             'totalAmount', 'status', 'createdAt', 'updatedAt',
-            'bidderName', 'companyName', 'winnerPhone',
+            'bidderName', 'companyName','auctionCompany', 'winnerPhone',
             'callNotes', 'lots',
         ]
 # -------------------------------------------------- Invoice (detail view)
@@ -171,6 +175,7 @@ class InvoiceDetailSerializer(InvoiceWinnerFieldsMixin, serializers.ModelSeriali
     totalAmount = serializers.ReadOnlyField()
     bidderName = serializers.SerializerMethodField()
     companyName = serializers.SerializerMethodField()
+    auctionCompany = serializers.SerializerMethodField()
     winnerPhone = serializers.SerializerMethodField()
     feePercentage = serializers.SerializerMethodField()
     verifiedBy = serializers.SerializerMethodField()
@@ -181,7 +186,7 @@ class InvoiceDetailSerializer(InvoiceWinnerFieldsMixin, serializers.ModelSeriali
             'id', 'invoiceNumber', 'invoiceDate', 'dueDate', 'winner',
             'importBatch', 'totalAmount', 'status', 'remarks',
             'createdAt', 'updatedAt', 'lots', 'payments', 'attachments',
-            'bidderName', 'companyName', 'winnerPhone',
+            'bidderName', 'companyName','auctionCompany', 'winnerPhone',
             'feePercentage', 'verifiedBy',
         ]
 

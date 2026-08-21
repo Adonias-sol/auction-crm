@@ -99,7 +99,7 @@ export const auditLog = [
 export const searchFieldDefs = {
   bidderName: { label: "bidder name", type: "text" },
   phoneNumber: { label: "phone number", type: "text" },
-  companyName: { label: "company name", type: "text" },
+  auctionCompany: { label: 'Auctioning company', type: 'text' },
   lotNo: { label: "lot number", type: "text" },
   batchId: { label: "import batch", type: "select", options: batches.map((b) => ({ v: String(b.id), l: b.batchName || b.companyName })) },
   status: { label: "payment status", type: "select", options: Object.keys(statusLabels).map((k) => ({ v: k, l: statusLabels[k] })) },

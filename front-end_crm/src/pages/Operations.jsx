@@ -4,6 +4,7 @@ import { ActionBtn } from "../components/ActionButton";
 import StatusCell from "../components/StatusCell";
 import GeneratePdfModal from "../components/GeneratePdfModal";
 import { apiCall } from "../api";
+import DueDateCell from "../components/DueDateCell";
 
 export default function Operations({ role, token, onOpenDetail }) {
   const [searchField, setSearchField] = useState("bidderName");
@@ -241,6 +242,18 @@ async function confirmBulkUpdate(newStatus) {
     console.error(err);
   }
 }
+async function changeDueDate(invId, newDate) {
+  try {
+    const response = await apiCall(`/api/invoices/${invId}/extend-due-date/`, {
+      method: 'POST',
+      body: JSON.stringify({ dueDate: newDate }),
+    });
+    if (response.ok) await fetchInvoices();
+    else setError('Failed to update due date');
+  } catch (err) {
+    setError('Network error updating due date');
+  }
+}
 
 function exportRecords() {
   const rowsToExport = selected.length > 0 ? invoices.filter((inv) => selected.includes(inv.id)) : rows;
@@ -362,7 +375,7 @@ function exportRecords() {
                 <th style={{ width: 32 }}>
                   {canGeneratePdf && <input type="checkbox" checked={rows.length > 0 && selected.length === rows.length} onChange={toggleAll} />}
                 </th>
-                <th>Invoice #</th><th>Bidder</th><th>Company</th><th>Lots</th><th>Total amount</th><th>Due date</th><th>Status</th>
+                <th>Invoice #</th><th>Bidder</th><th>Auctioning Company</th><th>Lots</th><th>Total amount</th><th>Due date</th><th>Status</th>
               </tr>
             </thead>
             <tbody>
@@ -388,10 +401,10 @@ function exportRecords() {
                     )}
                   </td>
                   <td>{inv.bidderName}</td>
-                  <td>{inv.companyName || <span style={{ color: "var(--text-3)" }}>—</span>}</td>
+                  <td>{inv.auctionCompany || <span style={{ color: "var(--text-3)" }}>—</span>}</td>
                   <td className="mono">{inv.lots?.length || 0}</td>
                   <td className="amount">{money(inv.totalAmount.toFixed(2))}</td>
-                  <td className="mono">{new Date(inv.dueDate).toLocaleDateString()}</td>
+                  <td><DueDateCell invoice={inv} role={role} onChangeDueDate={changeDueDate} /></td>
                   <td><StatusCell invoice={inv} role={role} onChangeStatus={changeStatus} /></td>
                   </tr>
               ))}

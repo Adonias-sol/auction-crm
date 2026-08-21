@@ -5,7 +5,7 @@ from decimal import Decimal, InvalidOperation
 import openpyxl
 from django.db import transaction
 from django.utils import timezone
-from rest_framework import viewsets, status
+from rest_framework import viewsets, status, mixins
 from rest_framework.decorators import action
 from rest_framework.parsers import MultiPartParser
 from rest_framework.permissions import IsAuthenticated
@@ -213,7 +213,9 @@ class ImportBatchConfirmView(APIView):
         # Optional: how many days out the due date defaults to. 14 is a
         # placeholder — swap for whatever finance's actual payment terms
         # are, or accept it per-batch from the request if it varies.
+        due_date_input = request.data.get('dueDate')  # e.g. "2026-09-03", from the preview screen
         due_in_days = int(request.data.get('dueInDays', 14))
+        invoice_due_date = due_date_input or (timezone.localdate() + timedelta(days=due_in_days))
 
         if not company_name or not auction_date:
             return Response({'error': 'companyName and auctionDate are required'}, status=status.HTTP_400_BAD_REQUEST)
@@ -262,7 +264,7 @@ class ImportBatchConfirmView(APIView):
                     importBatch=batch,
                     invoiceNumber=self._next_invoice_number(),
                     invoiceDate=timezone.localdate(),
-                    dueDate=timezone.localdate() + timedelta(days=due_in_days),
+                    dueDate=invoice_due_date,
                     status='invoice_generated',
                 )
 
@@ -298,7 +300,7 @@ class ImportBatchConfirmView(APIView):
         return f'INV-{year}-{count + 1:03d}'
 
 
-class ImportBatchViewSet(viewsets.ReadOnlyModelViewSet):
+class ImportBatchViewSet(mixins.DestroyModelMixin, viewsets.ReadOnlyModelViewSet):
     """GET /api/import-batches/ and /api/import-batches/{id}/ — read-only, confirm/ is what creates them."""
     queryset = ImportBatch.objects.select_related('importedBy').order_by('-uploadDate')
     serializer_class = ImportBatchSerializer
@@ -314,3 +316,13 @@ class ImportBatchViewSet(viewsets.ReadOnlyModelViewSet):
         if page is not None:
             return self.get_paginated_response(serializer.data)
         return Response(serializer.data)
+    
+    def perform_destroy(self, instance):
+        if not has_permission(self.request.user, 'delete_records'):
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied('Only administrators can delete import batches.')
+        with transaction.atomic():
+            # Invoice.delete() cascades to InvoiceLot/Payment/Attachment/AuditLog already
+            Invoice.objects.filter(importBatch=instance).delete()
+            Winner.objects.filter(importBatch=instance).delete()
+            instance.delete()

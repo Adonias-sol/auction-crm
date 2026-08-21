@@ -20,6 +20,7 @@ export default function ImportBatches({ role, token }) {
 });
   const [viewingBatch, setViewingBatch] = useState(null);
   const [batchInvoices, setBatchInvoices] = useState([]);
+  const [selectedBatches, setSelectedBatches] = useState([]);
 
   
 
@@ -126,16 +127,27 @@ export default function ImportBatches({ role, token }) {
       setLoading(false);
     }
 }
-  async function deleteBatch(id) {
-  if (!window.confirm("Delete this batch and all invoices generated from it? This cannot be undone.")) return;
-  try {
-    const res = await apiCall(`/api/import-batches/${id}/`, { method: 'DELETE' });
-    if (res.ok) await fetchBatches();
-    else setError('Failed to delete batch');
-  } catch {
-    setError('Network error deleting batch'); 
+  function toggleBatchRow(id) {
+  setSelectedBatches((s) => s.includes(id) ? s.filter((x) => x !== id) : [...s, id]);
   }
-}
+
+  function toggleAllBatches() {
+    setSelectedBatches(selectedBatches.length === batches.length ? [] : batches.map((b) => b.id));
+  }
+
+  async function deleteSelectedBatches() {
+    if (selectedBatches.length === 0) return;
+    if (!window.confirm(`Delete ${selectedBatches.length} batch${selectedBatches.length > 1 ? "es" : ""} and all invoices generated from them? This cannot be undone.`)) return;
+    try {
+      for (const id of selectedBatches) {
+        await apiCall(`/api/import-batches/${id}/`, { method: 'DELETE' });
+      }
+      await fetchBatches();
+      setSelectedBatches([]);
+    } catch {
+      setError('Network error deleting batches');
+    }
+  }
 
   return (
     <div>
@@ -187,9 +199,38 @@ export default function ImportBatches({ role, token }) {
             {preview.totalWinners || 0} winners · {preview.totalLots || 0} lots found
             {preview.flaggedCount > 0 && ` · ${preview.flaggedCount} row(s) flagged and skipped`}
           </div>
+
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginBottom: 12, alignItems: "center" }}>
+            {selectedBatches.length > 0 && (
+              <span style={{ fontSize: 12.5, color: "var(--text-2)" }}>
+                {selectedBatches.length} selected
+              </span>
+            )}
+            {role === "administrator" && (
+              <button
+                className="btn btn-danger btn-delete"
+                onClick={deleteSelectedBatches}
+                disabled={selectedBatches.length === 0}
+                title="Delete selected batches"
+                aria-label="Delete selected batches"
+              >
+                <svg className="btn-icon" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M16 9v10H8V9h8m-1.5-6h-5l-1 1H5v2h14V4h-3.5l-1-1zM9 16h2v-7H9v7zm4 0h2v-7h-2v7z" />
+                </svg>
+              </button>
+            )}
+          </div>          
+
           <div className="tbl-wrap" style={{ marginBottom: 14 }}>
             <table>
-              <thead><tr><th>Bidder</th><th>Phone</th><th>Lots</th><th>Total fee</th><th>Fee %</th></tr></thead>
+              <thead>
+                <tr>
+                  <th style={{ width: 32 }}>
+                    {role === "administrator" && <input type="checkbox" checked={batches.length > 0 && selectedBatches.length === batches.length} onChange={toggleAllBatches} />}
+                  </th>
+                  <th>Batch</th><th>Company</th><th>Auction date</th><th>Uploaded</th><th>Records</th><th>Status</th><th>Imported by</th>
+                </tr>
+              </thead>
               <tbody>
                 {(preview.groupedWinners || []).map((w, i) => (
                   <tr key={i}>
@@ -224,6 +265,9 @@ export default function ImportBatches({ role, token }) {
             <tbody>
               {batches.map((b) => (
                 <tr key={b.id}>
+                  <td>
+                    {role === "administrator" && <input type="checkbox" checked={selectedBatches.includes(b.id)} onChange={() => toggleBatchRow(b.id)} />}
+                  </td>
                   <td onClick={() => openBatchDetail(b)} style={{ cursor: "pointer" }}>
                     {b.batchName || <span style={{ color: "var(--text-3)" }}>—</span>}
                     <div style={{ fontSize: 11, color: "var(--text-3)" }} className="mono">{b.fileName}</div>
@@ -234,11 +278,6 @@ export default function ImportBatches({ role, token }) {
                   <td className="mono">{b.validRecords}/{b.totalRecords}</td>
                   <td><span className="stamp paid" style={{ transform: "none" }}>{b.status}</span></td>
                   <td>{b.importedBy}</td>
-                  <td>
-                      {role === "administrator" && (
-                        <button className="btn btn-sm btn-danger" onClick={() => deleteBatch(b.id)}>Delete</button>
-                      )}
-                  </td>
                 </tr>
               ))}
             </tbody>

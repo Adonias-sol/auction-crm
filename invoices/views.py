@@ -135,12 +135,12 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         collection_pct = (total_collected / total_due * 100) if total_due else 0
 
         def received_since(start_date):
-            invoice_ids = (
-                Payment.objects.filter(paymentStatus='verified', verifiedDate__date__gte=start_date)
-                .values_list('invoice_id', flat=True).distinct()
+            return (
+                InvoiceLot.objects.filter(
+                    invoice__status='paid',
+                    invoice__updatedAt__date__gte=start_date
+                ).aggregate(t=Sum('lotFee'))['t'] or 0
             )
-            return InvoiceLot.objects.filter(invoice_id__in=invoice_ids).aggregate(t=Sum('lotFee'))['t'] or 0
-
         today_collected = received_since(today)
         week_collected = received_since(week_start)
         month_collected = received_since(month_start)

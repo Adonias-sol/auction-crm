@@ -29,6 +29,12 @@ class StaffProfile(models.Model):
     isActive = models.BooleanField(default=True)
     lastPasswordChange = models.DateTimeField(null=True, blank=True)
     lastUsernameChange = models.DateTimeField(null=True, blank=True)
+    lastPasswordChangedBy = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='+'
+    )
+    lastUsernameChangedBy = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='+'
+    )
 
     def __str__(self):
         return f"{self.user.get_username()} ({self.role.name})"

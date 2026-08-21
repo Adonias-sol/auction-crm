@@ -125,3 +125,145 @@ class EmployeeDeactivateView(APIView):
         profile.user.is_active = profile.isActive
         profile.user.save(update_fields=['is_active'])
         return Response(EmployeeSerializer(profile).data)
+
+class EmployeeBulkDeactivateView(APIView):
+    """POST /api/employees/bulk-deactivate/ — {employeeIds: [...]}. Always sets isActive=False."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        if not has_permission(request.user, 'manage_users'):
+            return Response({'error': 'Only administrators can deactivate employees.'}, status=http_status.HTTP_403_FORBIDDEN)
+        ids = request.data.get('employeeIds', [])
+        profiles = StaffProfile.objects.filter(id__in=ids)
+        n = 0
+        for profile in profiles:
+            profile.isActive = False
+            profile.save(update_fields=['isActive'])
+            profile.user.is_active = False
+            profile.user.save(update_fields=['is_active'])
+            n += 1
+        return Response({'deactivated': n})
+
+
+class EmployeeBulkDeleteView(APIView):
+    """POST /api/employees/bulk-delete/ — {employeeIds: [...]}. Hard-deletes the User row
+    (StaffProfile cascades with it)."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        if not has_permission(request.user, 'manage_users'):
+            return Response({'error': 'Only administrators can delete employees.'}, status=http_status.HTTP_403_FORBIDDEN)
+        ids = request.data.get('employeeIds', [])
+        profiles = StaffProfile.objects.filter(id__in=ids)
+        user_ids = list(profiles.values_list('user_id', flat=True))
+        if request.user.id in user_ids:
+            return Response({'error': "You can't delete your own account."}, status=http_status.HTTP_400_BAD_REQUEST)
+        count = len(user_ids)
+        User.objects.filter(id__in=user_ids).delete()
+        return Response({'deleted': count})
+
+
+class EmployeeResetPasswordView(APIView):
+    """POST /api/employees/<id>/reset-password/ — admin sets a new password for any employee
+    without needing the old one. Uses set_password() so it's actually hashed."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, employee_id):
+        if not has_permission(request.user, 'manage_users'):
+            return Response({'error': 'Only administrators can reset passwords.'}, status=http_status.HTTP_403_FORBIDDEN)
+        try:
+            profile = StaffProfile.objects.get(id=employee_id)
+        except StaffProfile.DoesNotExist:
+            return Response({'error': 'Employee not found.'}, status=http_status.HTTP_404_NOT_FOUND)
+
+        new_password = request.data.get('newPassword', '')
+        if len(new_password) < 6:
+            return Response({'error': 'New password must be at least 6 characters.'}, status=http_status.HTTP_400_BAD_REQUEST)
+
+        profile.user.set_password(new_password)
+        profile.user.save()
+        profile.lastPasswordChangedBy = request.user
+        profile.lastPasswordChange = timezone.now()
+        profile.save(update_fields=['lastPasswordChangedBy', 'lastPasswordChange'])
+        return Response(EmployeeSerializer(profile).data)
+
+
+class RoleDeleteView(APIView):
+    """DELETE /api/roles/<id>/ — only custom (non-built-in) roles, and only if no employee
+    currently uses it. Prevent-deletion, not reassignment, so nobody's privileges silently
+    change underneath them."""
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, role_id):
+        if not has_permission(request.user, 'manage_users'):
+            return Response({'error': 'Only administrators can delete roles.'}, status=http_status.HTTP_403_FORBIDDEN)
+        try:
+            role = Role.objects.get(id=role_id)
+        except Role.DoesNotExist:
+            return Response({'error': 'Role not found.'}, status=http_status.HTTP_404_NOT_FOUND)
+        if role.isBuiltIn:
+            return Response({'error': 'Built-in roles cannot be deleted.'}, status=http_status.HTTP_400_BAD_REQUEST)
+        in_use = role.staff.count()
+        if in_use:
+            return Response(
+                {'error': f'{in_use} employee(s) still use this role. Reassign them to a different role first.'},
+                status=http_status.HTTP_400_BAD_REQUEST,
+            )
+        role.delete()
+        return Response({'success': True})
+
+
+class AccountProfileView(APIView):
+    """PATCH /api/account/profile/ — self-service display name / username edit for the
+    logged-in user. Tracks who changed the username (always self here)."""
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request):
+        user = request.user
+        display_name = request.data.get('displayName', '').strip()
+        new_username = request.data.get('username', '').strip()
+
+        if display_name:
+            first, *rest = display_name.split(' ', 1)
+            user.first_name = first
+            user.last_name = rest[0] if rest else ''
+
+        if new_username and new_username != user.username:
+            if User.objects.filter(username=new_username).exclude(id=user.id).exists():
+                return Response({'error': 'That username is already taken.'}, status=http_status.HTTP_400_BAD_REQUEST)
+            user.username = new_username
+            if hasattr(user, 'profile'):
+                user.profile.lastUsernameChangedBy = user
+                user.profile.lastUsernameChange = timezone.now()
+                user.profile.save(update_fields=['lastUsernameChangedBy', 'lastUsernameChange'])
+
+        user.save()
+        return Response({'username': user.get_username(), 'displayName': user.get_full_name() or user.get_username()})
+
+
+class AccountChangePasswordView(APIView):
+    """PATCH /api/account/change-password/ — self-service password change. Requires the
+    current password and actually hashes the new one via set_password()."""
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request):
+        user = request.user
+        old_password = request.data.get('oldPassword', '')
+        new_password = request.data.get('newPassword', '')
+
+        if not old_password or not new_password:
+            return Response({'error': 'Current and new password are required.'}, status=http_status.HTTP_400_BAD_REQUEST)
+        if not user.check_password(old_password):
+            return Response({'error': 'Current password is incorrect.'}, status=http_status.HTTP_400_BAD_REQUEST)
+        if len(new_password) < 6:
+            return Response({'error': 'New password must be at least 6 characters.'}, status=http_status.HTTP_400_BAD_REQUEST)
+
+        user.set_password(new_password)
+        user.save()
+
+        if hasattr(user, 'profile'):
+            user.profile.lastPasswordChangedBy = user
+            user.profile.lastPasswordChange = timezone.now()
+            user.profile.save(update_fields=['lastPasswordChangedBy', 'lastPasswordChange'])
+
+        return Response({'success': True})

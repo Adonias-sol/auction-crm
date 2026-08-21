@@ -10,7 +10,7 @@ function groupByCategory(catalog) {
   return groups;
 }
 
-function PrivilegeGrid({ catalog, selected, onToggle }) {
+function PrivilegeGrid({ catalog, selected, onToggle, readOnly }) {
   const grouped = groupByCategory(catalog);
   return (
     <div>
@@ -19,11 +19,12 @@ function PrivilegeGrid({ catalog, selected, onToggle }) {
           <div className="section-label" style={{ margin: "12px 0 8px" }}>{category}</div>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {items.map((p) => (
-              <label key={p.key} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13.5, cursor: "pointer" }}>
+              <label key={p.key} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13.5, cursor: readOnly ? "default" : "pointer" }}>
                 <input
                   type="checkbox"
                   checked={selected.includes(p.key)}
-                  onChange={() => onToggle(p.key)}
+                  onChange={() => !readOnly && onToggle(p.key)}
+                  disabled={readOnly}
                   style={{ width: 15, height: 15, accentColor: "var(--brass)", flexShrink: 0 }}
                 />
                 {p.label}
@@ -40,6 +41,7 @@ function NewEmployeeModal({ catalog, roles, onClose, onCreated, token }) {
   const [fullName, setFullName] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [roleId, setRoleId] = useState(roles[0]?.id || "");
   const [privileges, setPrivileges] = useState(roles[0]?.defaultPrivileges || []);
   const [error, setError] = useState("");
@@ -111,7 +113,16 @@ function NewEmployeeModal({ catalog, roles, onClose, onCreated, token }) {
             </div>
             <div className="field">
               <div className="fl">Temporary password</div>
-              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
+              <div style={{ position: "relative" }}>
+                <input
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Enter a temporary password"
+                  style={{ paddingRight: 36 }}
+                />
+                <EyeToggleButton show={showPassword} onToggle={() => setShowPassword((s) => !s)} />
+              </div>
             </div>
             <div className="field">
               <div className="fl">Role (template)</div>
@@ -267,6 +278,144 @@ function EditPrivilegesModal({ employee, catalog, onClose, onSaved, token }) {
   );
 }
 
+function EyeToggleButton({ show, onToggle }) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-label={show ? "Hide password" : "Show password"}
+      style={{
+        position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)",
+        background: "none", border: "none", cursor: "pointer", color: "var(--text-3)",
+        display: "flex", alignItems: "center", padding: 4,
+      }}
+    >
+      {show ? (
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a18.4 18.4 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+          <line x1="1" y1="1" x2="23" y2="23" />
+        </svg>
+      ) : (
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+          <circle cx="12" cy="12" r="3" />
+        </svg>
+      )}
+    </button>
+  );
+}
+
+function ResetPasswordModal({ employee, onClose, onSaved, token }) {
+  const [newPassword, setNewPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [show, setShow] = useState(false);
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  async function handleSave() {
+    setError("");
+    if (newPassword.length < 6) { setError("Password must be at least 6 characters."); return; }
+    if (newPassword !== confirm) { setError("Passwords don't match."); return; }
+    setSaving(true);
+    try {
+      const res = await apiCall(`/api/employees/${employee.id}/reset-password/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Token ${token}` } : {}),
+        },
+        body: JSON.stringify({ newPassword }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Failed to reset password");
+        return;
+      }
+      onSaved();
+      onClose();
+    } catch (err) {
+      setError("Network error resetting password");
+      console.error(err);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="overlay active">
+      <div className="modal" style={{ maxWidth: 420 }}>
+        <div className="modal-head">
+          <h3 style={{ margin: 0 }}>Reset password — {employee.name}</h3>
+          <button className="modal-close" onClick={onClose}>&times;</button>
+        </div>
+        <div className="modal-body">
+          <div className="field" style={{ marginBottom: 14 }}>
+            <div className="fl">New password</div>
+            <div style={{ position: "relative" }}>
+              <input
+                type={show ? "text" : "password"}
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="Enter new password"
+                style={{ paddingRight: 36 }}
+              />
+              <EyeToggleButton show={show} onToggle={() => setShow((s) => !s)} />
+            </div>
+          </div>
+          <div className="field" style={{ marginBottom: 14 }}>
+            <div className="fl">Confirm new password</div>
+            <input
+              type={show ? "text" : "password"}
+              value={confirm}
+              onChange={(e) => setConfirm(e.target.value)}
+              placeholder="Confirm new password"
+            />
+          </div>
+          {error && <div style={{ color: "var(--red)", marginBottom: 10, fontSize: 13 }}>{error}</div>}
+          <div className="modal-actions">
+            <button className="btn btn-brass" onClick={handleSave} disabled={saving}>
+              {saving ? "Saving..." : "Set new password"}
+            </button>
+            <button className="btn" onClick={onClose} disabled={saving}>Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function EmployeePreviewModal({ employee, catalog, onClose, onEditPrivileges, onResetPassword }) {
+  return (
+    <div className="overlay active">
+      <div className="modal">
+        <div className="modal-head">
+          <h3 style={{ margin: 0 }}>{employee.name}</h3>
+          <button className="modal-close" onClick={onClose}>&times;</button>
+        </div>
+        <div className="modal-body">
+          <div className="field-grid">
+            <div className="field"><div className="fl">Username</div><div className="fv mono">{employee.username}</div></div>
+            <div className="field"><div className="fl">Email</div><div className="fv">{employee.email || <span style={{ color: "var(--text-3)" }}>—</span>}</div></div>
+            <div className="field"><div className="fl">Role</div><div className="fv">{employee.roleName}</div></div>
+            <div className="field"><div className="fl">Status</div><span className={`stamp ${employee.isActive ? "paid" : "cancelled"}`}>{employee.isActive ? "Active" : "Inactive"}</span></div>
+            <div className="field"><div className="fl">Last password change</div><div className="fv">{employee.lastPasswordChangedBy || <span style={{ color: "var(--text-3)" }}>—</span>}</div></div>
+            <div className="field"><div className="fl">Last username change</div><div className="fv">{employee.lastUsernameChangedBy || <span style={{ color: "var(--text-3)" }}>—</span>}</div></div>
+          </div>
+
+          <div className="section-label">Privileges ({employee.privilegeCount})</div>
+          <PrivilegeGrid catalog={catalog} selected={employee.privileges || []} onToggle={() => {}} readOnly />
+
+          <div className="modal-actions">
+            <button className="btn btn-brass" onClick={onEditPrivileges}>Edit privileges</button>
+            <button className="btn" onClick={onResetPassword}>Reset password</button>
+            <button className="btn btn-ghost" onClick={onClose}>Close</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Employees({ role, token }) {
   const [employees, setEmployees] = useState([]);
   const [roles, setRoles] = useState([]);
@@ -276,6 +425,9 @@ export default function Employees({ role, token }) {
   const [showNewEmployee, setShowNewEmployee] = useState(false);
   const [showNewRole, setShowNewRole] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState(null);
+  const [previewEmployee, setPreviewEmployee] = useState(null);
+  const [resetPwEmployee, setResetPwEmployee] = useState(null);
+  const [selected, setSelected] = useState([]);
 
   const canManage = role === "administrator";
 
@@ -306,20 +458,66 @@ export default function Employees({ role, token }) {
     }
   }
 
-  async function handleDeactivate(emp) {
-    if (!window.confirm(`${emp.isActive ? "Deactivate" : "Reactivate"} ${emp.name}?`)) return;
+  function toggleRow(id) {
+    setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
+  }
+
+  function toggleAll() {
+    setSelected(selected.length === employees.length ? [] : employees.map((e) => e.id));
+  }
+
+  async function bulkDeactivate() {
+    if (selected.length === 0) return;
+    if (!window.confirm(`Deactivate ${selected.length} employee${selected.length > 1 ? "s" : ""}? They will no longer be able to log in.`)) return;
     try {
-      const res = await apiCall(`/api/employees/${emp.id}/deactivate/`, {
+      const res = await apiCall('/api/employees/bulk-deactivate/', {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Token ${token}` } : {}) },
+        body: JSON.stringify({ employeeIds: selected }),
+      });
+      if (!res.ok) { setError("Failed to deactivate selected employees"); return; }
+      setSelected([]);
+      await fetchAll();
+    } catch (err) {
+      setError("Network error deactivating employees");
+      console.error(err);
+    }
+  }
+
+  async function bulkDelete() {
+    if (selected.length === 0) return;
+    if (!window.confirm(`Delete ${selected.length} employee${selected.length > 1 ? "s" : ""}? This cannot be undone.`)) return;
+    try {
+      const res = await apiCall('/api/employees/bulk-delete/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Token ${token}` } : {}) },
+        body: JSON.stringify({ employeeIds: selected }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setError(data.error || "Failed to delete selected employees"); return; }
+      setSelected([]);
+      await fetchAll();
+    } catch (err) {
+      setError("Network error deleting employees");
+      console.error(err);
+    }
+  }
+
+  async function deleteRole(r) {
+    if (!window.confirm(`Delete the "${r.name}" role? This cannot be undone.`)) return;
+    try {
+      const res = await apiCall(`/api/roles/${r.id}/`, {
+        method: 'DELETE',
         headers: token ? { Authorization: `Token ${token}` } : {},
       });
       if (!res.ok) {
-        setError("Failed to update employee status");
+        const data = await res.json().catch(() => ({}));
+        setError(data.error || "Failed to delete role");
         return;
       }
       await fetchAll();
     } catch (err) {
-      setError("Network error updating employee status");
+      setError("Network error deleting role");
       console.error(err);
     }
   }
@@ -337,9 +535,20 @@ export default function Employees({ role, token }) {
 
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginBottom: 16 }}>
-        <button className="btn btn-brass" onClick={() => setShowNewEmployee(true)}>New employee</button>
-        <button className="btn btn-primary" onClick={() => setShowNewRole(true)}>New role</button>
+      <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 16 }}>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          {selected.length > 0 && (
+            <>
+              <span style={{ fontSize: 12.5, color: "var(--text-2)" }}>{selected.length} selected</span>
+              <button className="btn btn-amber btn-sm" onClick={bulkDeactivate}>Deactivate selected</button>
+              <button className="btn btn-danger btn-sm" onClick={bulkDelete}>Delete selected</button>
+            </>
+          )}
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button className="btn btn-brass" onClick={() => setShowNewEmployee(true)}>New employee</button>
+          <button className="btn btn-primary" onClick={() => setShowNewRole(true)}>New role</button>
+        </div>
       </div>
 
       {error && <div style={{ color: "var(--red)", marginBottom: 12, fontSize: 13 }}>{error}</div>}
@@ -349,6 +558,9 @@ export default function Employees({ role, token }) {
           <table>
             <thead>
               <tr>
+                <th style={{ width: 32 }}>
+                  <input type="checkbox" checked={employees.length > 0 && selected.length === employees.length} onChange={toggleAll} />
+                </th>
                 <th>Name</th>
                 <th>Username</th>
                 <th>Role</th>
@@ -362,18 +574,16 @@ export default function Employees({ role, token }) {
             <tbody>
               {employees.map((emp) => (
                 <tr key={emp.id}>
-                  <td>{emp.name}</td>
+                  <td><input type="checkbox" checked={selected.includes(emp.id)} onChange={() => toggleRow(emp.id)} /></td>
+                  <td style={{ cursor: "pointer", color: "var(--brass-dark)" }} onClick={() => setPreviewEmployee(emp)}>{emp.name}</td>
                   <td className="mono">{emp.username}</td>
                   <td>{emp.roleName}</td>
                   <td><span className={`stamp ${emp.isActive ? "paid" : "cancelled"}`}>{emp.isActive ? "Active" : "Inactive"}</span></td>
-                  <td>{emp.lastPasswordChange ? new Date(emp.lastPasswordChange).toLocaleDateString() : "—"}</td>
-                  <td>{emp.lastUsernameChange ? new Date(emp.lastUsernameChange).toLocaleDateString() : "—"}</td>
+                  <td>{emp.lastPasswordChangedBy || <span style={{ color: "var(--text-3)" }}>—</span>}</td>
+                  <td>{emp.lastUsernameChangedBy || <span style={{ color: "var(--text-3)" }}>—</span>}</td>
                   <td className="mono">{emp.privilegeCount}</td>
                   <td className="row-actions">
                     <button className="btn btn-sm" onClick={() => setEditingEmployee(emp)}>Edit privileges</button>
-                    <button className="btn btn-sm btn-danger" onClick={() => handleDeactivate(emp)}>
-                      {emp.isActive ? "Deactivate" : "Reactivate"}
-                    </button>
                   </td>
                 </tr>
               ))}
@@ -392,6 +602,7 @@ export default function Employees({ role, token }) {
                   <th>Role</th>
                   <th>Default privileges</th>
                   <th>Type</th>
+                  <th></th>
                 </tr>
               </thead>
               <tbody>
@@ -399,7 +610,14 @@ export default function Employees({ role, token }) {
                   <tr key={r.id}>
                     <td>{r.name}</td>
                     <td className="mono">{r.privilegeCount}/{catalog.length} default privileges</td>
-                    <td style={{ color: "var(--text-3)" }}>{r.isBuiltIn ? "Built-in" : "Custom"}</td>
+                    <td style={{ color: "var(--text-3)" }}>
+                      {r.isBuiltIn ? <span className="badge-note">Built-in</span> : "Custom"}
+                    </td>
+                    <td>
+                      {!r.isBuiltIn && (
+                        <button className="btn btn-sm btn-danger" onClick={() => deleteRole(r)}>Delete</button>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -409,30 +627,25 @@ export default function Employees({ role, token }) {
       </div>
 
       {showNewEmployee && (
-        <NewEmployeeModal
-          catalog={catalog}
-          roles={roles}
-          token={token}
-          onClose={() => setShowNewEmployee(false)}
-          onCreated={fetchAll}
-        />
+        <NewEmployeeModal catalog={catalog} roles={roles} token={token} onClose={() => setShowNewEmployee(false)} onCreated={fetchAll} />
       )}
       {showNewRole && (
-        <NewRoleModal
-          catalog={catalog}
-          token={token}
-          onClose={() => setShowNewRole(false)}
-          onCreated={fetchAll}
-        />
+        <NewRoleModal catalog={catalog} token={token} onClose={() => setShowNewRole(false)} onCreated={fetchAll} />
       )}
       {editingEmployee && (
-        <EditPrivilegesModal
-          employee={editingEmployee}
+        <EditPrivilegesModal employee={editingEmployee} catalog={catalog} token={token} onClose={() => setEditingEmployee(null)} onSaved={fetchAll} />
+      )}
+      {previewEmployee && (
+        <EmployeePreviewModal
+          employee={previewEmployee}
           catalog={catalog}
-          token={token}
-          onClose={() => setEditingEmployee(null)}
-          onSaved={fetchAll}
+          onClose={() => setPreviewEmployee(null)}
+          onEditPrivileges={() => { setEditingEmployee(previewEmployee); setPreviewEmployee(null); }}
+          onResetPassword={() => { setResetPwEmployee(previewEmployee); setPreviewEmployee(null); }}
         />
+      )}
+      {resetPwEmployee && (
+        <ResetPasswordModal employee={resetPwEmployee} token={token} onClose={() => setResetPwEmployee(null)} onSaved={fetchAll} />
       )}
     </div>
   );

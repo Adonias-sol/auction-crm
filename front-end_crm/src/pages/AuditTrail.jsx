@@ -18,6 +18,7 @@ export default function AuditTrail({ role, token }) {
   
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [clearing, setClearing] = useState(false);
   
   const [filters, setFilters] = useState({
     user_id: "",
@@ -33,6 +34,8 @@ export default function AuditTrail({ role, token }) {
   const [count, setCount] = useState(0);
 
   const canView = role === "administrator" || role === "finance_manager";
+  const canClear = role === "administrator";
+
   useEffect(() => { if (canView) fetchFilterOptions(); }, []);
   useEffect(() => { setPage(1); }, [filters]);
   useEffect(() => { if (canView) fetchLogs(); }, [filters, ordering, page]);
@@ -103,6 +106,32 @@ export default function AuditTrail({ role, token }) {
     return ordering.startsWith('-') ? " ↓" : " ↑";
   }
 
+  async function clearAuditTrail() {
+    if (!window.confirm("Clear the entire audit trail? This permanently deletes every log entry and cannot be undone.")) return;
+    setClearing(true);
+    setError("");
+    try {
+      const res = await apiCall('/api/audit-logs/clear/', {
+        method: 'DELETE',
+        headers: token ? { Authorization: `Token ${token}` } : {},
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Failed to clear audit trail");
+        return;
+      }
+      setLogs([]);
+      setCount(0);
+      setTotalPages(1);
+      setPage(1);
+    } catch (err) {
+      setError("Network error clearing audit trail");
+      console.error(err);
+    } finally {
+      setClearing(false);
+    }
+  }
+
   if (!canView) {
     return (
       <div className="card">
@@ -144,6 +173,16 @@ export default function AuditTrail({ role, token }) {
           <div className="fl">Date to</div>
           <input type="date" value={filters.date_to} onChange={(e) => setF("date_to", e.target.value)} />
         </div>
+        {canClear && (
+          <button
+            className="btn btn-sm btn-danger"
+            onClick={clearAuditTrail}
+            disabled={clearing || logs.length === 0}
+            title="Permanently delete every audit log entry"
+          >
+            {clearing ? "Clearing..." : "Clear audit trail"}
+          </button>
+        )}
       </div>
 
       {error && <div style={{ color: "var(--red)", marginBottom: 12, fontSize: 13 }}>{error}</div>}

@@ -7,6 +7,7 @@ export default function CallCenter({ role, token }) {
   const [statusFilter, setStatusFilter] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [notesEditMode, setNotesEditMode] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [draftNote, setDraftNote] = useState("");
   const [saving, setSaving] = useState(false);
@@ -39,6 +40,7 @@ export default function CallCenter({ role, token }) {
   }
 
   function startEdit(row) {
+    if (!notesEditMode || !canManage) return;
     setEditingId(row.id);
     setDraftNote(row.callNotes || "");
   }
@@ -86,21 +88,36 @@ export default function CallCenter({ role, token }) {
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 16, flexWrap: "wrap" }}>
         <div className="field" style={{ maxWidth: 240 }}>
-            <select
-                className="select-standalone"
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                style={{ maxWidth: 240 }}
-                >
-                {statusFilters.map((s) => (
-                    <option key={s.value} value={s.value}>{s.label}</option>
-                ))}
-            </select>
+          <select
+            className="select-standalone"
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            style={{ maxWidth: 240 }}
+          >
+            {statusFilters.map((s) => (
+              <option key={s.value} value={s.value}>{s.label}</option>
+            ))}
+          </select>
         </div>
         <div style={{ fontSize: 13, color: "var(--text-2)" }}>
-            {loading ? "Loading..." : `${rows.length} to contact`}
+          {loading ? "Loading..." : `${rows.length} to contact`}
         </div>
+        {canManage && (
+          <button
+            className={"btn btn-sm" + (notesEditMode ? " btn-brass" : "")}
+            style={{ marginLeft: "auto" }}
+            onClick={() => { setNotesEditMode((v) => !v); cancelEdit(); }}
+          >
+            {notesEditMode ? "Done editing" : "Edit notes"}
+          </button>
+        )}
+      </div>
+
+      {notesEditMode && (
+        <div className="queue-note" style={{ marginBottom: 10 }}>
+          Click any row below to edit its note.
         </div>
+      )}
 
       {error && <div style={{ color: "var(--red)", marginBottom: 12, fontSize: 13 }}>{error}</div>}
 
@@ -123,7 +140,11 @@ export default function CallCenter({ role, token }) {
               {rows.length === 0 && !loading ? (
                 <tr><td colSpan={8} style={{ textAlign: "center", color: "var(--text-3)", padding: 20 }}>Nobody to contact right now</td></tr>
               ) : rows.map((r) => (
-                <tr key={r.id}>
+                <tr
+                  key={r.id}
+                  onClick={() => editingId !== r.id && startEdit(r)}
+                  style={{ cursor: notesEditMode && canManage && editingId !== r.id ? "pointer" : "default" }}
+                >
                   <td>{r.bidderName}</td>
                   <td className="mono">{r.phone}</td>
                   <td>{r.companyName}</td>
@@ -131,7 +152,7 @@ export default function CallCenter({ role, token }) {
                   <td className="amount">ETB {Number(r.amountDue).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                   <td>{r.dueDate}</td>
                   <td><span className={`stamp ${r.status}`}>{STATUS_LABELS[r.status] || r.status}</span></td>
-                  <td style={{ minWidth: 220 }}>
+                  <td style={{ minWidth: 220 }} onClick={(e) => e.stopPropagation()}>
                     {editingId === r.id ? (
                       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                         <input
@@ -148,17 +169,8 @@ export default function CallCenter({ role, token }) {
                         </div>
                       </div>
                     ) : (
-                      <div
-                        style={{
-                          fontSize: 13,
-                          color: r.callNotes ? "var(--text)" : "var(--text-3)",
-                          fontStyle: r.callNotes ? "normal" : "italic",
-                          cursor: canManage ? "pointer" : "default",
-                        }}
-                        onClick={() => canManage && startEdit(r)}
-                      >
+                      <div style={{ fontSize: 13, color: r.callNotes ? "var(--text)" : "var(--text-3)", fontStyle: r.callNotes ? "normal" : "italic" }}>
                         {r.callNotes || "No notes yet"}
-                        {canManage && <span style={{ marginLeft: 8, color: "var(--brass)", fontSize: 12 }}>Edit</span>}
                       </div>
                     )}
                   </td>
@@ -170,7 +182,7 @@ export default function CallCenter({ role, token }) {
       </div>
 
       <div className="locked-note" style={{ marginTop: 14 }}>
-        Only CRM / Call Center Officers can call bidders or add notes here — everyone else can view the notes they've logged, read-only.
+        Only CRM / Call Center Officers can call bidders or add notes here — click "Edit notes" above, then click a row to update it.
       </div>
     </div>
   );

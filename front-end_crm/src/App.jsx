@@ -142,6 +142,7 @@ export default function App() {
       {showAccountSettings && (
         <AccountSettingsModal
           username={session.username}
+          token={session.token}
           onSave={handleSaveProfile}
           onClose={() => setShowAccountSettings(false)}
         />

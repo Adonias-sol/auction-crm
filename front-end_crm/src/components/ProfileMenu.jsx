@@ -50,7 +50,17 @@ export default function ProfileMenu({ username, role, theme, setTheme, onLogout,
               </button>
             </div>
 
-            <button className="profile-menu-item" onClick={() => { setOpen(false); onOpenAccountSettings(); }}>Edit profile</button>
+            <button
+              className="profile-menu-item"
+              onClick={() => { setOpen(false); onOpenAccountSettings(); }}
+              style={{ display: "flex", alignItems: "center", gap: 8 }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 20h9" />
+                <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+              </svg>
+              Edit profile
+            </button>
             <button className="profile-menu-item" onClick={onLogout}>Log out</button>
           </div>
         </>

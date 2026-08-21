@@ -521,6 +521,22 @@ export default function Employees({ role, token }) {
       console.error(err);
     }
   }
+  async function bulkActivate() {
+      if (selected.length === 0) return;
+      try {
+        const res = await apiCall('/api/employees/bulk-activate/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Token ${token}` } : {}) },
+          body: JSON.stringify({ employeeIds: selected }),
+        });
+        if (!res.ok) { setError("Failed to activate selected employees"); return; }
+        setSelected([]);
+        await fetchAll();
+      } catch (err) {
+        setError("Network error activating employees");
+        console.error(err);
+      }
+    }
 
   if (!canManage) {
     return (
@@ -537,13 +553,24 @@ export default function Employees({ role, token }) {
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 16 }}>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          {selected.length > 0 && (
-            <>
-              <span style={{ fontSize: 12.5, color: "var(--text-2)" }}>{selected.length} selected</span>
-              <button className="btn btn-amber btn-sm" onClick={bulkDeactivate}>Deactivate selected</button>
-              <button className="btn btn-danger btn-sm" onClick={bulkDelete}>Delete selected</button>
-            </>
-          )}
+          {selected.length > 0 && (() => {
+            const selectedEmployees = employees.filter((e) => selected.includes(e.id));
+            const allInactive = selectedEmployees.every((e) => !e.isActive);
+            return (
+              <>
+                <span style={{ fontSize: 12.5, color: "var(--text-2)" }}>{selected.length} selected</span>
+                {selected.length === 1 && (
+                  <button className="btn btn-sm" onClick={() => setEditingEmployee(selectedEmployees[0])}>
+                    Edit privileges
+                  </button>
+                )}
+                <button className="btn btn-amber btn-sm" onClick={allInactive ? bulkActivate : bulkDeactivate}>
+                  {allInactive ? "Activate" : "Deactivate"}
+                </button>
+                <button className="btn btn-danger btn-sm" onClick={bulkDelete}>Delete</button>
+              </>
+            );
+          })()}
         </div>
         <div style={{ display: "flex", gap: 8 }}>
           <button className="btn btn-brass" onClick={() => setShowNewEmployee(true)}>New employee</button>
@@ -568,7 +595,7 @@ export default function Employees({ role, token }) {
                 <th>Last password change</th>
                 <th>Last username change</th>
                 <th>Privileges</th>
-                <th>Actions</th>
+                
               </tr>
             </thead>
             <tbody>
@@ -582,9 +609,6 @@ export default function Employees({ role, token }) {
                   <td>{emp.lastPasswordChangedBy || <span style={{ color: "var(--text-3)" }}>—</span>}</td>
                   <td>{emp.lastUsernameChangedBy || <span style={{ color: "var(--text-3)" }}>—</span>}</td>
                   <td className="mono">{emp.privilegeCount}</td>
-                  <td className="row-actions">
-                    <button className="btn btn-sm" onClick={() => setEditingEmployee(emp)}>Edit privileges</button>
-                  </td>
                 </tr>
               ))}
             </tbody>

@@ -144,7 +144,23 @@ class EmployeeBulkDeactivateView(APIView):
             n += 1
         return Response({'deactivated': n})
 
+class EmployeeBulkActivateView(APIView):
+    """POST /api/employees/bulk-activate/ — {employeeIds: [...]}. Always sets isActive=True."""
+    permission_classes = [IsAuthenticated]
 
+    def post(self, request):
+        if not has_permission(request.user, 'manage_users'):
+            return Response({'error': 'Only administrators can activate employees.'}, status=http_status.HTTP_403_FORBIDDEN)
+        ids = request.data.get('employeeIds', [])
+        profiles = StaffProfile.objects.filter(id__in=ids)
+        n = 0
+        for profile in profiles:
+            profile.isActive = True
+            profile.save(update_fields=['isActive'])
+            profile.user.is_active = True
+            profile.user.save(update_fields=['is_active'])
+            n += 1
+        return Response({'activated': n})
 class EmployeeBulkDeleteView(APIView):
     """POST /api/employees/bulk-delete/ — {employeeIds: [...]}. Hard-deletes the User row
     (StaffProfile cascades with it)."""

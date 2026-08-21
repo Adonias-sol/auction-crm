@@ -509,6 +509,17 @@ class AuditLogFilterOptionsView(APIView):
             'roles': list(roles),
             'actionTypes': [{'value': v, 'label': l} for v, l in AuditLog.ACTION_TYPE_CHOICES],
         })
+        
+class AuditLogClearView(APIView):
+    """DELETE /api/audit-logs/clear/ — permanently wipes every audit log entry.
+    Administrator-only, backs the 'Clear audit trail' button."""
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request):
+        if not has_permission(request.user, 'delete_records'):
+            return Response({'error': 'Only administrators can clear the audit trail.'}, status=status.HTTP_403_FORBIDDEN)
+        count, _ = AuditLog.objects.all().delete()
+        return Response({'deleted': count})
     
 class FeeConfigView(generics.GenericAPIView):
     """GET current active config, PUT to create a new active one (keeps history — see FeeConfig docstring)."""

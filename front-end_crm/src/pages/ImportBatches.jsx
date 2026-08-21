@@ -14,15 +14,13 @@ export default function ImportBatches({ role, token }) {
   const [error, setError] = useState("");
   const fileInputRef = useRef(null);
   const [dueDate, setDueDate] = useState(() => {
-  const d = new Date();
-  d.setDate(d.getDate() + 14);
-  return d.toISOString().slice(0, 10);
-});
+    const d = new Date();
+    d.setDate(d.getDate() + 14);
+    return d.toISOString().slice(0, 10);
+  });
   const [viewingBatch, setViewingBatch] = useState(null);
   const [batchInvoices, setBatchInvoices] = useState([]);
   const [selectedBatches, setSelectedBatches] = useState([]);
-
-  
 
   useEffect(() => {
     fetchBatches();
@@ -36,6 +34,7 @@ export default function ImportBatches({ role, token }) {
       setBatchInvoices(data.results || data);
     }
   }
+
   async function fetchBatches() {
     try {
       const response = await apiCall('/api/import-batches/', {
@@ -126,9 +125,10 @@ export default function ImportBatches({ role, token }) {
     } finally {
       setLoading(false);
     }
-}
+  }
+
   function toggleBatchRow(id) {
-  setSelectedBatches((s) => s.includes(id) ? s.filter((x) => x !== id) : [...s, id]);
+    setSelectedBatches((s) => s.includes(id) ? s.filter((x) => x !== id) : [...s, id]);
   }
 
   function toggleAllBatches() {
@@ -159,7 +159,7 @@ export default function ImportBatches({ role, token }) {
         <div className="upload-form">
           <div className="full">
             <label>Bid data report <span className="req">*</span> — .xlsx only</label>
-            <div 
+            <div
               className="filedrop"
               onDragOver={(e) => e.preventDefault()}
               onDrop={(e) => {
@@ -170,10 +170,10 @@ export default function ImportBatches({ role, token }) {
               style={{ cursor: 'pointer' }}
             >
               {file ? file.name : "bid_data_report.xlsx — drag file here or click to browse"}
-              <input 
+              <input
                 ref={fileInputRef}
-                type="file" 
-                accept=".xlsx" 
+                type="file"
+                accept=".xlsx"
                 onChange={(e) => setFile(e.target.files?.[0])}
                 style={{ display: 'none' }}
               />
@@ -200,37 +200,9 @@ export default function ImportBatches({ role, token }) {
             {preview.flaggedCount > 0 && ` · ${preview.flaggedCount} row(s) flagged and skipped`}
           </div>
 
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginBottom: 12, alignItems: "center" }}>
-            {selectedBatches.length > 0 && (
-              <span style={{ fontSize: 12.5, color: "var(--text-2)" }}>
-                {selectedBatches.length} selected
-              </span>
-            )}
-            {role === "administrator" && (
-              <button
-                className="btn btn-danger btn-delete"
-                onClick={deleteSelectedBatches}
-                disabled={selectedBatches.length === 0}
-                title="Delete selected batches"
-                aria-label="Delete selected batches"
-              >
-                <svg className="btn-icon" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M16 9v10H8V9h8m-1.5-6h-5l-1 1H5v2h14V4h-3.5l-1-1zM9 16h2v-7H9v7zm4 0h2v-7h-2v7z" />
-                </svg>
-              </button>
-            )}
-          </div>          
-
           <div className="tbl-wrap" style={{ marginBottom: 14 }}>
             <table>
-              <thead>
-                <tr>
-                  <th style={{ width: 32 }}>
-                    {role === "administrator" && <input type="checkbox" checked={batches.length > 0 && selectedBatches.length === batches.length} onChange={toggleAllBatches} />}
-                  </th>
-                  <th>Batch</th><th>Company</th><th>Auction date</th><th>Uploaded</th><th>Records</th><th>Status</th><th>Imported by</th>
-                </tr>
-              </thead>
+              <thead><tr><th>Bidder</th><th>Phone</th><th>Lots</th><th>Total fee</th><th>Fee %</th></tr></thead>
               <tbody>
                 {(preview.groupedWinners || []).map((w, i) => (
                   <tr key={i}>
@@ -246,9 +218,9 @@ export default function ImportBatches({ role, token }) {
           </div>
           <div className="locked-note" style={{ marginBottom: 14 }}>Fee % is editable per winner before confirming — click a row to adjust.</div>
           <div className="field" style={{ maxWidth: 220, marginBottom: 14 }}>
-          <div className="fl">Due date <span className="opt">(defaults to +14 days)</span></div>
-          <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
-        </div>
+            <div className="fl">Due date <span className="opt">(defaults to +14 days)</span></div>
+            <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+          </div>
           <div style={{ display: "flex", gap: 8 }}>
             <button className="btn btn-brass" onClick={confirmImport} disabled={loading}>
               {loading ? 'Confirming...' : 'Confirm & create invoices'}
@@ -258,10 +230,38 @@ export default function ImportBatches({ role, token }) {
         </div>
       )}
 
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginBottom: 12, alignItems: "center" }}>
+        {selectedBatches.length > 0 && (
+          <span style={{ fontSize: 12.5, color: "var(--text-2)" }}>
+            {selectedBatches.length} selected
+          </span>
+        )}
+        {role === "administrator" && (
+          <button
+            className="btn btn-danger btn-delete"
+            onClick={deleteSelectedBatches}
+            disabled={selectedBatches.length === 0}
+            title="Delete selected batches"
+            aria-label="Delete selected batches"
+          >
+            <svg className="btn-icon" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M16 9v10H8V9h8m-1.5-6h-5l-1 1H5v2h14V4h-3.5l-1-1zM9 16h2v-7H9v7zm4 0h2v-7h-2v7z" />
+            </svg>
+          </button>
+        )}
+      </div>
+
       <div className="tbl-wrap">
         <div style={{ overflowX: "auto" }}>
           <table>
-            <thead><tr><th>Batch</th><th>Company</th><th>Auction date</th><th>Uploaded</th><th>Records</th><th>Status</th><th>Imported by</th><th>Actions</th></tr></thead>
+            <thead>
+              <tr>
+                <th style={{ width: 32 }}>
+                  {role === "administrator" && <input type="checkbox" checked={batches.length > 0 && selectedBatches.length === batches.length} onChange={toggleAllBatches} />}
+                </th>
+                <th>Batch</th><th>Company</th><th>Auction date</th><th>Uploaded</th><th>Records</th><th>Status</th><th>Imported by</th>
+              </tr>
+            </thead>
             <tbody>
               {batches.map((b) => (
                 <tr key={b.id}>

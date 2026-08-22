@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { navItems } from "../data";
+import { getAccessibleNavItems } from "../data";
 import logo from "../logo";
 import ProfileMenu from "./ProfileMenu";
 
 export default function Header({ page, setPage, role, username, theme, setTheme, onLogout, onOpenAccountSettings }) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const items = getAccessibleNavItems(role);
 
   const goTo = (key) => {
     setPage(key);
@@ -19,7 +20,7 @@ export default function Header({ page, setPage, role, username, theme, setTheme,
       </div>
       <div className="navbar-right">
         <div className="nav">
-          {navItems.map((n) => (
+          {items.map((n) => (
             <div key={n.key} className={"nav-item" + (page === n.key ? " active" : "")} onClick={() => goTo(n.key)}>
               {n.label}
             </div>
@@ -43,7 +44,7 @@ export default function Header({ page, setPage, role, username, theme, setTheme,
         <>
           <div className="mobile-nav-scrim" onClick={() => setMobileNavOpen(false)} />
           <div className="mobile-nav-panel">
-            {navItems.map((n) => (
+            {items.map((n) => (
               <div key={n.key} className={"nav-item" + (page === n.key ? " active" : "")} onClick={() => goTo(n.key)}>
                 {n.label}
               </div>

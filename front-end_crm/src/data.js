@@ -35,6 +35,36 @@ export const navItems = [
   { key: "employees", label: "Employees" },
 ];
 
+// Mirrors each page's own internal canView/canManage check — kept here so
+// the nav bar and the page component agree on who can see what. null means
+// "no restriction, any logged-in role."
+export const pagePermissions = {
+  dashboard: ["administrator", "auction_manager", "finance_manager", "viewer"],
+  import: null,
+  operations: null,
+  queues: ["administrator", "auction_manager", "finance_manager"],
+  reports: ["administrator"],
+  callcenter: null,
+  audit: ["administrator", "finance_manager"],
+  employees: ["administrator"],
+};
+
+export function canAccessPage(pageKey, role) {
+  const allowed = pagePermissions[pageKey];
+  return !allowed || allowed.includes(role);
+}
+
+export function getAccessibleNavItems(role) {
+  return navItems.filter((n) => canAccessPage(n.key, role));
+}
+
+export function getDefaultPage(role) {
+  const accessible = getAccessibleNavItems(role);
+  return accessible.length > 0 ? accessible[0].key : null;
+}
+
+
+
 export const money = (n) =>
   "ETB " + Number(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 

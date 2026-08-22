@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { invoicesSeed } from "./data";
+import { useState, useEffect } from "react";
+import { invoicesSeed, canAccessPage, getDefaultPage } from "./data";
 import "./styles.css";
 
 import Login from "./components/Login";
@@ -52,6 +52,12 @@ export default function App() {
   const [detailInvNumber, setDetailInvNumber] = useState(null);
   const detailInvoice = invoices.find((inv) => inv.inv === detailInvNumber) || null;
 
+  useEffect(() => {
+    if (session && !canAccessPage(page, session.role)) {
+      setPage(getDefaultPage(session.role));
+    }
+  }, [session]);
+
   function generateInvoicePdfs(percentagesByInv) {
     setInvoices((prev) => prev.map((inv) => {
       if (!(inv.inv in percentagesByInv)) return inv;
@@ -86,8 +92,8 @@ export default function App() {
   function handleLogin(role, username, token, remember) {
     sessionStorage.setItem("authToken", token);
     setSession({ role, username, token });
+    setPage(getDefaultPage(role));
   }
-
   function handleSaveProfile(newUsername) {
     setSession((s) => ({ ...s, username: newUsername }));
   }

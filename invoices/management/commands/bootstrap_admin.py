@@ -2,8 +2,9 @@ import os
 
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
+from django.utils import timezone
 
-from invoices.models import StaffProfile
+from invoices.models import StaffProfile, Role
 
 
 class Command(BaseCommand):
@@ -15,7 +16,7 @@ class Command(BaseCommand):
     interactively. Idempotent — safe to run on every single deploy; it only
     actually creates anything the first time.
     """
-    help = "Creates the initial superuser + StaffProfile(role=administrator) from env vars, if they don't already exist."
+    help = "Creates the initial superuser + StaffProfile(role=Administrator) from env vars, if they don't already exist."
 
     def handle(self, *args, **options):
         username = os.environ.get('BOOTSTRAP_ADMIN_USERNAME')
@@ -25,6 +26,14 @@ class Command(BaseCommand):
         if not username or not password:
             self.stdout.write(self.style.WARNING(
                 'BOOTSTRAP_ADMIN_USERNAME / BOOTSTRAP_ADMIN_PASSWORD not set — skipping.'
+            ))
+            return
+
+        try:
+            admin_role = Role.objects.get(name='Administrator')
+        except Role.DoesNotExist:
+            self.stdout.write(self.style.ERROR(
+                'No "Administrator" Role found — did the seed_roles migration (0008) run? Run `python manage.py migrate` first.'
             ))
             return
 
@@ -41,9 +50,12 @@ class Command(BaseCommand):
             self.stdout.write(f'User "{username}" already exists — left as-is.')
 
         _, profile_created = StaffProfile.objects.get_or_create(
-            user=user, defaults={'role': 'administrator'}
+            user=user, defaults={
+                'role': admin_role,
+                'privileges': list(admin_role.defaultPrivileges),
+            }
         )
         if profile_created:
-            self.stdout.write(self.style.SUCCESS('Created StaffProfile(role=administrator).'))
+            self.stdout.write(self.style.SUCCESS('Created StaffProfile(role=Administrator).'))
         else:
             self.stdout.write('StaffProfile already existed — left as-is.')

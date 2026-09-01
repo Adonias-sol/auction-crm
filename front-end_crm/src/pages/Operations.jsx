@@ -184,7 +184,7 @@ async function fetchInvoices() {
         const safeName = (invoiceRecord?.bidderName || `Invoice_${invId}`)
           .trim()
           .replace(/[^a-zA-Z0-9]+/g, '_');
-        a.download = `${safeName}.pdf`;
+        a.download = `${safeName}_${invoiceRecord?.invoiceNumber || invId}.pdf`;
         document.body.appendChild(a);
         a.click();
         window.URL.revokeObjectURL(url);

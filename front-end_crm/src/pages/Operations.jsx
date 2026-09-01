@@ -179,7 +179,12 @@ async function fetchInvoices() {
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `Invoice_${invId}.pdf`;
+
+        const invoiceRecord = invoices.find((i) => String(i.id) === String(invId));
+        const safeName = (invoiceRecord?.bidderName || `Invoice_${invId}`)
+          .trim()
+          .replace(/[^a-zA-Z0-9]+/g, '_');
+        a.download = `${safeName}.pdf`;
         document.body.appendChild(a);
         a.click();
         window.URL.revokeObjectURL(url);
